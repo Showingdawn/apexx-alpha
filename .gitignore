@@ -36,6 +36,10 @@ yarn-error.log*
 # vercel
 .vercel
 
-# typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backend exclusions
+backend/node_modules/
+backend/dist/
+serviceAccountKey.json

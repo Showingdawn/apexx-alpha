@@ -1,0 +1,213 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+/* ─── Elite Tier CSS ─────────────────────────────────── */
+
+:root {
+  --onyx: #050505;
+  --gold: #D4AF37;
+  --gold-glow: rgba(212, 175, 55, 0.2);
+  --border-dim: #1a1a1a;
+  --neon-green: #00FF94;
+  --electric-red: #FF3131;
+  --font-ui: 'Inter', sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+}
+
+body {
+  background-color: var(--onyx);
+  color: #eaecef;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .bento-card {
+    background: linear-gradient(145deg, #0a0a0a, #050505);
+    border: 1px solid var(--border-dim);
+    border-radius: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bento-card:hover {
+    border-color: var(--gold-glow);
+    box-shadow: 0 0 30px rgba(212, 175, 55, 0.05);
+    transform: translateY(-2px);
+  }
+
+  .text-gold {
+    color: var(--gold);
+  }
+
+  .bg-gold {
+    background-color: var(--gold);
+  }
+
+  .mono-nums {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .glass-sidebar {
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border-dim);
+  }
+
+  .glass-panel {
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--gold-glow);
+    border-radius: 16px;
+  }
+
+  .success-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--gold-glow);
+    transform: scale(0);
+    animation: ripple 0.8s ease-out;
+    pointer-events: none;
+  }
+
+  @keyframes ripple {
+    to {
+      transform: scale(4);
+      opacity: 0;
+    }
+  }
+
+  .glow-gold {
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+  }
+  
+  .glow-green {
+    text-shadow: 0 0 10px rgba(0, 255, 148, 0.4);
+  }
+  
+  .glow-red {
+    text-shadow: 0 0 10px rgba(255, 49, 49, 0.4);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--onyx);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #222;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
+}
+
+/* ─── Command Bar ─── */
+.cmd-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
+}
+
+.cmd-card {
+  width: 100%;
+  max-width: 560px;
+  background: rgba(10, 10, 10, 0.98);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 20px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 60px rgba(212, 175, 55, 0.06);
+  overflow: hidden;
+}
+
+/* ─── Volume Heat ─── */
+.volume-heat {
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.4), 0 0 20px rgba(212, 175, 55, 0.15);
+  background: linear-gradient(90deg, rgba(212,175,55,0.04) 0%, transparent 100%);
+}
+
+/* ─── Sparklines ─── */
+.sparkline-svg {
+  overflow: visible;
+}
+.sparkline-svg polyline {
+  transition: stroke 0.3s ease;
+}
+
+/* ─── Split Pane ─── */
+.split-pane-container {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  background: #111;
+}
+.split-pane-container.split-2 {
+  grid-template-columns: 1fr 1fr;
+}
+.split-pane-container.split-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.split-pane {
+  position: relative;
+  overflow: hidden;
+  background: #050505;
+  min-height: 0;
+}
+
+/* ─── Trailing SL Active ─── */
+@keyframes trailing-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,175,55,0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(212,175,55,0); }
+}
+.trailing-active {
+  animation: trailing-ring 1.5s ease-out infinite;
+  border-color: rgba(212,175,55,0.6) !important;
+}
+
+/* ─── Brokerage rows ─── */
+.fee-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: 'Roboto Mono', monospace;
+  padding: 2px 0;
+  color: #888;
+}
+.fee-row span:last-child {
+  color: #FF3131;
+}
+.fee-total {
+  border-top: 1px solid #1a1a1a;
+  margin-top: 4px;
+  padding-top: 4px;
+  color: #FF3131 !important;
+  font-weight: 700;
+}
+
+/* ─── Performance DNA ─── */
+.dna-stat-card {
+  background: linear-gradient(145deg, #0a0a0a, #050505);
+  border: 1px solid #1a1a1a;
+  border-radius: 12px;
+  padding: 20px;
+  transition: border-color 0.3s;
+}
+.dna-stat-card:hover {
+  border-color: rgba(212,175,55,0.3);
+}
