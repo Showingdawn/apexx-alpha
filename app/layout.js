@@ -6,6 +6,9 @@ import ClientSetup from "@/components/ClientSetup";
 export const metadata = {
   title: "APEX ALPHA | Sovereign Elite Tier",
   description: "Institutional Grade Agentic Trading Terminal",
+  other: {
+    'google-adsense-account': 'ca-pub-3740887631837879',
+  },
 };
 
 export default function RootLayout({ children }) {
