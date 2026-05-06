@@ -76,6 +76,36 @@ function SVGSparkline({ data, isProfit, entryPrice, width = 80, height = 32 }) {
 }
 
 // ─── Component ─────────────────────────────────────────
+// ─── Ghost Price Component ──────────────────────────────
+function GhostPrice({ value, isPositive }) {
+  const [prevValue, setPrevValue] = useState(value);
+  const [glow, setGlow] = useState(null); // 'green' | 'red' | null
+
+  useEffect(() => {
+    if (value > prevValue) {
+      setGlow("green");
+      const t = setTimeout(() => setGlow(null), 500);
+      return () => clearTimeout(t);
+    } else if (value < prevValue) {
+      setGlow("red");
+      const t = setTimeout(() => setGlow(null), 500);
+      return () => clearTimeout(t);
+    }
+    setPrevValue(value);
+  }, [value, prevValue]);
+
+  const glowClass = glow === "green" ? "bg-[#00e676]/20 text-[#00e676] shadow-[0_0_20px_#00e67633]" : 
+                    glow === "red" ? "bg-[#ff1744]/20 text-[#ff1744] shadow-[0_0_20px_#ff174433]" : 
+                    isPositive ? "text-[#00e676]" : "text-[#ff1744]";
+
+  return (
+    <span className={`px-2 py-0.5 rounded transition-all duration-300 font-mono font-black ${glowClass}`}>
+      {value}
+    </span>
+  );
+}
+
+// ─── Component ─────────────────────────────────────────
 export default function TradeHistory({ optimisticTrades = [], setOptimisticTrades }) {
   const [loading, setLoading] = useState(true);
   const [marketPrices, setMarketPrices] = useState({});
@@ -87,7 +117,7 @@ export default function TradeHistory({ optimisticTrades = [], setOptimisticTrade
       if (!auth.currentUser) return;
       try {
         const token = await auth.currentUser.getIdToken();
-        const res = await axios.get("http://localhost:3001/api/trade/history", {
+        const res = await axios.get("/api/trade/history", {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (setOptimisticTrades) {
@@ -96,7 +126,7 @@ export default function TradeHistory({ optimisticTrades = [], setOptimisticTrade
           const assets = [...new Set(sorted.map(t => t.asset))];
           assets.forEach(async (asset) => {
             try {
-              const sRes = await axios.get(`http://localhost:3001/api/market/snapshot?symbol=${encodeURIComponent(asset)}`);
+              const sRes = await axios.get(`/api/market/snapshot?symbol=${encodeURIComponent(asset)}`);
               setMarketSnapshots(prev => ({ ...prev, [asset]: sRes.data }));
               setSparklines(prev => ({ ...prev, [asset]: sRes.data.sparklineData }));
             } catch { /* silent */ }
@@ -112,53 +142,55 @@ export default function TradeHistory({ optimisticTrades = [], setOptimisticTrade
   }, [setOptimisticTrades]);
 
   useEffect(() => {
-    const socket = io("http://localhost:3001");
+    const socket = io("/");
     socket.on("market_update", (prices) => setMarketPrices(prices));
     return () => socket.disconnect();
   }, []);
 
   return (
-    <div className="bento-card p-5 flex flex-col h-full max-h-[600px] bg-[#050505] border-[#1a1a1a]">
+    <div className="flex flex-col h-full max-h-[700px] font-body">
       {/* Header */}
-      <div className="flex justify-between items-center mb-5">
-        <div className="flex items-center gap-3">
-          <Brain size={16} className="text-[#D4AF37]" />
-          <h2 className="text-white font-black tracking-[0.1em] uppercase text-[11px]">Adaptive Intelligence Feed</h2>
+      <div className="flex justify-between items-center mb-6 px-4">
+        <div className="flex items-center gap-4">
+          <div className="p-2 border border-[#f0c040]/30 text-[#f0c040]">
+            <Brain size={16} />
+          </div>
+          <div>
+            <h2 className="text-white font-header font-black tracking-[0.2em] uppercase text-[11px]">Neural Audit Ledger</h2>
+            <p className="text-[8px] text-gray-600 font-mono uppercase tracking-widest mt-1">Real-time Strategy Verification</p>
+          </div>
         </div>
-        <div className="text-[9px] bg-[#D4AF37]/10 border border-[#D4AF37]/30 px-2 py-1 rounded text-[#D4AF37] uppercase tracking-widest font-black flex items-center gap-1">
-          <Zap size={9} className="fill-[#D4AF37]" /> CMC Killer v3.2
+        <div className="text-[9px] glass-panel border-[#f0c040]/30 px-3 py-1.5 text-[#f0c040] font-header font-black flex items-center gap-2">
+          <Zap size={10} className="fill-[#f0c040]" /> CMC PROTOCOL V9.1
         </div>
       </div>
 
       {loading ? (
-        <div className="text-gray-600 text-center py-12 animate-pulse text-[10px] uppercase tracking-widest font-black">
-          Decrypting Ledger Data...
+        <div className="text-gray-700 text-center py-20 animate-pulse text-[10px] uppercase tracking-[0.5em] font-header">
+          Decrypting Sovereign Ledger...
         </div>
       ) : (
-        <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar">
-          <table className="w-full text-left border-separate border-spacing-y-1.5">
+        <div className="overflow-y-auto flex-1 pr-1 custom-scrollbar px-1">
+          <table className="w-full text-left border-separate border-spacing-y-2">
             <thead>
-              <tr className="text-gray-600 uppercase tracking-widest text-[8px] font-black">
-                <th className="pb-2 px-2">Asset / Time</th>
-                <th className="pb-2 px-2">Sentiment</th>
-                <th className="pb-2 px-2 text-center w-24">7D Sparkline</th>
-                <th className="pb-2 px-2 text-right">Size</th>
-                <th className="pb-2 px-2 text-right">Entry / P&L</th>
-                <th className="pb-2 px-2 text-center">Status</th>
-                {/* Fees column if present */}
-                <th className="pb-2 px-2 text-right">Fees</th>
+              <tr className="text-gray-500 uppercase tracking-[0.3em] text-[8px] font-header font-black">
+                <th className="pb-4 px-4">Asset Matrix</th>
+                <th className="pb-4 px-4">Sentiment</th>
+                <th className="pb-4 px-4 text-center">Spectral 7D</th>
+                <th className="pb-4 px-4 text-right">Allocation</th>
+                <th className="pb-4 px-4 text-right">Entry / P&L Delta</th>
+                <th className="pb-4 px-4 text-center">State</th>
               </tr>
             </thead>
             <tbody>
               {optimisticTrades.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-12 text-gray-700 italic text-xs">
-                    Awaiting execution orders...
+                  <td colSpan="6" className="text-center py-20 text-gray-800 italic text-[10px] uppercase font-header tracking-widest">
+                    Awaiting Market Entry Commands...
                   </td>
                 </tr>
               ) : optimisticTrades.map((trade) => {
                 let pnlValue = 0;
-                let pnlString = "0.00";
                 let isPositive = false;
                 const livePrice = marketPrices[trade.asset] || 0;
 
@@ -168,109 +200,95 @@ export default function TradeHistory({ optimisticTrades = [], setOptimisticTrade
                     : trade.entryPrice - livePrice;
                   pnlValue = spread * trade.lot;
                   isPositive = pnlValue >= 0;
-                  pnlString = (isPositive ? "+" : "") + pnlValue.toFixed(2);
                 } else if (trade.status === "CLOSED") {
                   const floatPnl = parseFloat(trade.pnl) || 0;
                   isPositive = floatPnl >= 0;
                   pnlValue = floatPnl;
-                  pnlString = trade.pnl;
                 }
 
-                const sentimentValue = ((trade.entryPrice || 50000) % 100) / 100 * 100; // deterministic based on price
+                const sentimentValue = ((trade.entryPrice || 50000) % 100) / 100 * 100;
                 const assetSparkline = sparklines[trade.asset] || [];
-                const fees = trade.fees;
 
                 return (
                   <motion.tr
                     layout
                     key={trade.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="group bg-[#0a0a0a] hover:bg-[#111] border border-[#1a1a1a] transition-all"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="group glass-panel border-white/5 hover:border-[#f0c040]/20 transition-all cursor-none"
                   >
                     {/* Asset */}
-                    <td className="py-3.5 px-3 rounded-l-xl">
-                      <div className="flex items-center gap-2">
-                        <div className={`p-1 rounded ${trade.type === "BUY" ? "bg-[#00FF94]/10 text-[#00FF94]" : "bg-[#FF3131]/10 text-[#FF3131]"}`}>
-                          {trade.type === "BUY" ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                        </div>
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-1 h-8 ${trade.type === "BUY" ? "bg-[#00e676]" : "bg-[#ff1744]"}`} />
                         <div>
-                          <p className="text-white font-black text-[11px]" style={{ fontFamily: "'Inter', sans-serif" }}>{trade.asset}</p>
-                          <p className="text-[8px] text-gray-600 font-mono uppercase">
-                            {new Date(trade.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          <p className="text-white font-header font-black text-[11px] group-hover:text-[#f0c040] transition-colors">{trade.asset}</p>
+                          <p className="text-[8px] text-gray-700 font-mono uppercase mt-1">
+                             T+: {new Date(trade.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                           </p>
                         </div>
                       </div>
                     </td>
 
-                    {/* Sentiment bar */}
-                    <td className="py-3.5 px-3">
-                      <div className="w-16 h-1.5 bg-[#050505] rounded-full overflow-hidden border border-[#1a1a1a]">
-                        <div
-                          className={`h-full ${sentimentValue > 50 ? "bg-[#00FF94]/40" : "bg-[#FF3131]/40"}`}
-                          style={{ width: `${sentimentValue}%` }}
-                        />
-                      </div>
-                      <p className="text-[7px] font-black uppercase tracking-tighter mt-1 text-gray-600">
-                        {sentimentValue > 60 ? "Bull Zone" : sentimentValue < 40 ? "Bear Zone" : "Neutral"}
-                      </p>
+                    {/* Sentiment */}
+                    <td className="py-4 px-4">
+                       <div className="flex flex-col gap-1.5">
+                          <div className="w-20 h-[3px] bg-white/5">
+                             <div 
+                               className={`h-full ${sentimentValue > 50 ? "bg-[#00e676]" : "bg-[#ff1744]"} shadow-[0_0_10px_currentColor]`}
+                               style={{ width: `${sentimentValue}%` }}
+                             />
+                          </div>
+                          <p className="text-[7px] font-mono uppercase tracking-[0.2em] text-gray-600">
+                            Neural Index: <span className="text-white">{sentimentValue.toFixed(0)}</span>
+                          </p>
+                       </div>
                     </td>
 
-                    {/* SVG Sparkline */}
-                    <td className="py-3.5 px-3 text-center">
-                      <div className="mx-auto w-20 h-8 flex items-center justify-center grayscale group-hover:grayscale-0 transition-all opacity-60 group-hover:opacity-100">
+                    {/* Spectral Sparkline */}
+                    <td className="py-4 px-4">
+                      <div className="mx-auto w-24 h-10 grayscale group-hover:grayscale-0 transition-all opacity-40 group-hover:opacity-100 flex items-center justify-center">
                         <SVGSparkline
                           data={assetSparkline}
                           isProfit={isPositive}
                           entryPrice={trade.entryPrice}
-                          width={80}
-                          height={32}
+                          width={96}
+                          height={36}
                         />
                       </div>
-                      <p className="text-[7px] text-gray-700 font-mono text-center mt-0.5">Entry ──</p>
                     </td>
 
                     {/* Size */}
-                    <td className="py-3.5 px-3 text-right">
-                      <p className="text-white font-black text-[11px]" style={{ fontFamily: "'Roboto Mono', monospace" }}>
+                    <td className="py-4 px-4 text-right">
+                      <p className="text-white font-mono font-black text-[12px]">
                         {(trade.lot || 0).toLocaleString()}
                       </p>
-                      <p className="text-[8px] text-gray-600 uppercase font-black">Units</p>
+                      <p className="text-[7px] text-gray-700 uppercase font-header font-black mt-1 tracking-widest">Capacity</p>
                     </td>
 
                     {/* Entry / P&L */}
-                    <td className="py-3.5 px-3 text-right">
-                      <p className={`text-[11px] font-black ${trade.status === "PENDING" ? "text-gray-600" : isPositive ? "text-[#00FF94] glow-green" : "text-[#FF3131] glow-red"}`}
-                        style={{ fontFamily: "'Roboto Mono', monospace" }}
-                      >
-                        {trade.status === "PENDING" ? "---" : `$${pnlString}`}
-                      </p>
-                      <p className="text-[8px] text-gray-600 font-mono">
-                        @ ${(trade.entryPrice ?? 0).toFixed(2)}
-                      </p>
+                    <td className="py-4 px-4 text-right">
+                      <div className="flex flex-col items-end">
+                         {trade.status === "PENDING" ? (
+                           <span className="text-[11px] font-mono text-gray-800">---</span>
+                         ) : (
+                           <GhostPrice value={pnlValue.toFixed(2)} isPositive={isPositive} />
+                         )}
+                         <p className="text-[8px] text-gray-700 font-mono mt-1">
+                           @ {(trade.entryPrice ?? 0).toFixed(2)}
+                         </p>
+                      </div>
                     </td>
 
                     {/* Status */}
-                    <td className="py-3.5 px-3 text-center">
-                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border ${
-                        trade.status === "PENDING" ? "bg-yellow-900/10 text-yellow-500 border-yellow-500/30 animate-pulse" :
-                        trade.status === "OPEN"    ? "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30" :
-                        "bg-gray-800/10 text-gray-600 border-gray-700/30"
+                    <td className="py-4 px-4 text-center">
+                      <span className={`text-[8px] font-header font-black uppercase px-3 py-1 border ${
+                        trade.status === "PENDING" ? "text-gray-700 border-gray-800" :
+                        trade.status === "OPEN"    ? "text-[#f0c040] border-[#f0c040]/40" :
+                        "text-white/20 border-white/5"
                       }`}>
                         {trade.status}
                       </span>
-                    </td>
-
-                    {/* Fees */}
-                    <td className="py-3.5 px-3 rounded-r-xl text-right">
-                      {fees ? (
-                        <div>
-                          <p className="text-[10px] font-mono text-[#FF3131] font-bold">-${fees.total?.toFixed(2)}</p>
-                          <p className="text-[7px] text-gray-700 uppercase font-black">STT+GST</p>
-                        </div>
-                      ) : (
-                        <span className="text-[9px] text-gray-800">—</span>
-                      )}
                     </td>
                   </motion.tr>
                 );

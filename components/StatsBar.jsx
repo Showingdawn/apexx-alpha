@@ -31,8 +31,8 @@ export default function StatsBar({ balance = 0, setBalance }) {
       try {
         // Fetch Market Data
         const [niftyRes, btcRes] = await Promise.all([
-          axios.get(`http://localhost:3001/api/market/snapshot?symbol=${encodeURIComponent('^NSEI')}`),
-          axios.get(`http://localhost:3001/api/market/snapshot?symbol=${encodeURIComponent('BTC-USD')}`)
+          axios.get(`/api/market/snapshot?symbol=${encodeURIComponent('^NSEI')}`),
+          axios.get(`/api/market/snapshot?symbol=${encodeURIComponent('BTC-USD')}`)
         ]);
         
         if (niftyRes.data && btcRes.data) {
@@ -105,7 +105,7 @@ export default function StatsBar({ balance = 0, setBalance }) {
            Agentic Pulse
         </p>
         <p className="text-white text-xs font-bold leading-tight italic">
-          "{marketData.nifty.change < 0 ? "Nifty dip detected. Support at 22k?" : nudge}"
+          "{marketData.nifty.price > 0 ? (marketData.nifty.change < 0 ? "Nifty dip detected. Support at 22k?" : nudge) : "Re-calibrating Matrix..."}"
         </p>
       </motion.div>
     </div>

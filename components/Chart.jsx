@@ -239,15 +239,16 @@ export default function Chart({ selectedAsset, onAssetSearch, slPrice, tpPrice, 
       </div>
 
       {/* Chart body */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden scanlines bg-[#020205]">
+        <div className="absolute inset-0 z-0 crt-flicker opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
         {!splitMode && (
-          <div id="tv_chart_single" ref={containerRef} className="w-full h-full bg-[#050505]" />
+          <div id="tv_chart_single" ref={containerRef} className="w-full h-full bg-transparent" />
         )}
 
         {(splitMode === "2" || splitMode === "4") && (
-          <div className={`split-pane-container ${splitMode === "2" ? "split-2" : "split-4"} h-full`}>
+          <div className={`split-pane-container ${splitMode === "2" ? "split-2" : "split-4"} h-full bg-[#111]`}>
             {Array.from({ length: paneCount }, (_, i) => (
-              <div key={i} className="split-pane relative">
+              <div key={i} className="split-pane relative bg-[#020205]">
                 <PaneHeader
                   symbol={paneSymbols[i] || selectedAsset}
                   paneIdx={i}

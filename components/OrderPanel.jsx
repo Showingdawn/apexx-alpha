@@ -47,6 +47,7 @@ export default function OrderPanel({
   lockTime,
   isTrailing,
   setIsTrailing,
+  onTrade,
 }) {
   const [lot, setLot]                       = useState("1");
   const [loading, setLoading]               = useState(false);
@@ -55,14 +56,15 @@ export default function OrderPanel({
   const [trailPercent, setTrailPercent]     = useState(1);
 
   const lotValue    = parseFloat(lot) || 0;
-  const tradeValue  = lotValue * (currentPrice || 0);
+  const safePrice   = currentPrice || 1; // Prevent division by zero
+  const tradeValue  = lotValue * safePrice;
   const fees        = brokerageEnabled ? calcFees(tradeValue) : null;
   const marginRequired = tradeValue / 5;
-  const riskRatio   = balance > 0 ? tradeValue / balance : 0;
+  const riskRatio   = (balance > 0) ? (tradeValue / balance) : 0;
   const isHighRisk  = riskRatio > 0.5;
 
-  const estProfit = tpPrice > 0 ? (Math.abs(tpPrice - currentPrice) * lotValue).toFixed(2) : "0.00";
-  const estLoss   = slPrice  > 0 ? (Math.abs(currentPrice - slPrice) * lotValue).toFixed(2)  : "0.00";
+  const estProfit = tpPrice > 0 ? (Math.abs(tpPrice - safePrice) * lotValue).toFixed(2) : "0.00";
+  const estLoss   = slPrice  > 0 ? (Math.abs(safePrice - slPrice) * lotValue).toFixed(2)  : "0.00";
 
   const isPreset = ASSETS.some(a => a.symbol === selectedAsset);
   const categories = [...new Set(ASSETS.map(a => a.category))];
@@ -73,18 +75,9 @@ export default function OrderPanel({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  function triggerRipple(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ripple = document.createElement("span");
-    ripple.className = "success-ripple";
-    ripple.style.left = `${e.clientX - rect.left}px`;
-    ripple.style.top  = `${e.clientY - rect.top}px`;
-    e.currentTarget.appendChild(ripple);
-    setTimeout(() => ripple.remove(), 800);
-  }
-
   async function handleCloseAll() {
     setIsPanic(true);
+    if (onTrade) onTrade();
     toast.loading("Initiating Global Liquidation...");
     setTimeout(() => {
       setOptimisticTrades([]);
@@ -96,7 +89,7 @@ export default function OrderPanel({
 
   async function handleTrade(type, e) {
     if (!auth.currentUser) return toast.error("Must be logged in to trade");
-    triggerRipple(e);
+    if (onTrade) onTrade();
 
     const tempId = `pending-${Date.now()}`;
     const newPendingTrade = {
@@ -109,7 +102,7 @@ export default function OrderPanel({
 
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await axios.post("http://localhost:3001/api/trade", {
+      const res = await axios.post("/api/trade", {
         type, lot: Number(lot), asset: selectedAsset, brokerageEnabled,
       }, { headers: { Authorization: `Bearer ${token}` } });
 
@@ -129,73 +122,77 @@ export default function OrderPanel({
   }
 
   return (
-    <div className="glass-panel p-5 h-full flex flex-col border border-[var(--gold-glow)] shadow-2xl relative overflow-hidden backdrop-blur-2xl">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--gold)] opacity-[0.05] blur-3xl rounded-full -mr-16 -mt-16" />
+    <div className="p-6 h-full flex flex-col font-body relative overflow-hidden bg-[#020205]">
+      {/* Decorative gradients */}
+      <div className="absolute top-0 right-0 w-48 h-48 bg-[#f0c040] opacity-[0.03] blur-[100px] rounded-full -mr-24 -mt-24 pointer-events-none" />
 
       {/* Lock overlay */}
       <AnimatePresence>
         {isLocked && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 bg-[#050505]/80 backdrop-blur-xl flex flex-col items-center justify-center p-8 text-center"
+            className="absolute inset-0 z-[100] bg-[#020205]/95 backdrop-blur-3xl flex flex-col items-center justify-center p-10 text-center"
           >
-            <div className="p-4 rounded-full bg-[#D4AF37]/10 border border-[#D4AF37]/30 mb-4">
-              <ShieldCheck className="text-[#D4AF37]" size={32} />
+            <div className="p-6 border border-[#f0c040]/30 text-[#f0c040] mb-6">
+              <ShieldCheck size={40} />
             </div>
-            <h3 className="text-[#D4AF37] font-black text-xs uppercase tracking-[0.3em] mb-2">Discipline Lock Active</h3>
-            <p className="text-[10px] text-gray-500 font-bold mb-6">Daily loss threshold exceeded.</p>
-            <span className="text-4xl font-black font-mono text-white">{formatTime(lockTime)}</span>
-            <span className="text-[8px] text-gray-700 uppercase font-black tracking-widest mt-1">Cool-off Duration</span>
+            <h3 className="text-[#f0c040] font-header font-black text-[11px] uppercase tracking-[0.4em] mb-4">Discipline Protocol Active</h3>
+            <p className="text-[10px] text-gray-600 font-mono uppercase tracking-widest mb-10 max-w-[200px] leading-loose">Daily liquidation threshold breached. Access revoked.</p>
+            <span className="text-5xl font-black font-mono text-white tracking-tighter">{formatTime(lockTime)}</span>
+            <span className="text-[8px] text-gray-700 uppercase font-header font-black tracking-[0.5em] mt-4">Cool-off Matrix</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className={`flex-1 overflow-y-auto pr-1 -mr-1 custom-scrollbar pb-4 ${isLocked ? "blur-sm grayscale opacity-30 select-none pointer-events-none" : ""}`}>
         {/* Header */}
-        <div className="flex justify-between items-center mb-5">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-[#D4AF37]/10 rounded border border-[#D4AF37]/30 text-[#D4AF37]">
-              <Zap size={13} />
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2 border border-[#f0c040]/30 text-[#f0c040]">
+              <Zap size={15} />
             </div>
-            <h2 className="text-white font-black text-xs uppercase tracking-[0.2em]">Precision Terminal</h2>
+            <div>
+               <h2 className="text-white font-header font-black text-[11px] uppercase tracking-[0.2em]">Execution Terminal</h2>
+               <p className="text-[8px] text-gray-700 font-mono uppercase tracking-widest mt-0.5">Vanguard Alpha v6.2</p>
+            </div>
           </div>
           <button
             onClick={handleCloseAll}
-            className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border transition-all ${isPanic ? "bg-[#FF3131] text-white border-white animate-pulse" : "bg-[#0a0a0a] text-[#FF3131] border-[#FF3131]/30 hover:bg-[#FF3131]/10"}`}
+            className={`text-[9px] font-header font-black uppercase px-4 py-2 border transition-all ${isPanic ? "bg-[#ff1744] text-white border-[#ff1744] animate-pulse" : "bg-black text-[#ff1744] border-[#ff1744]/30 hover:bg-[#ff1744]/10"}`}
           >
             Liquidate All
           </button>
         </div>
 
-        {/* TP/SL preview */}
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-[8px] text-gray-600 uppercase font-black">Target TP</p>
-              <p className="text-[8px] text-[#00FF94] font-black">+${estProfit}</p>
+        {/* TP/SL preview grid */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="p-4 bg-white/[0.02] border border-white/5 group hover:border-[#00e676]/30 transition-all">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-[8px] text-gray-600 uppercase font-header font-black tracking-widest">Alpha Target</p>
+              <p className="text-[8px] text-[#00e676] font-mono font-black">+${estProfit}</p>
             </div>
-            <p className="text-[12px] text-white font-mono font-black">${tpPrice || "---"}</p>
+            <p className="text-lg text-white font-mono font-black tracking-tighter">${tpPrice || "0.00"}</p>
           </div>
-          <div className="p-2.5 bg-black/40 border border-white/5 rounded-xl">
-            <div className="flex justify-between items-center mb-1">
-              <p className="text-[8px] text-gray-600 uppercase font-black">Safety SL</p>
-              <p className="text-[8px] text-[#FF3131] font-black">-${estLoss}</p>
+          <div className="p-4 bg-white/[0.02] border border-white/5 group hover:border-[#ff1744]/30 transition-all">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-[8px] text-gray-600 uppercase font-header font-black tracking-widest">Risk Floor</p>
+              <p className="text-[8px] text-[#ff1744] font-mono font-black">-${estLoss}</p>
             </div>
-            <p className="text-[12px] text-white font-mono font-black">${slPrice || "---"}</p>
+            <p className="text-lg text-white font-mono font-black tracking-tighter">${slPrice || "0.00"}</p>
           </div>
         </div>
 
-        {/* Asset selector */}
-        <div className="mb-4">
-          <label className="text-[10px] text-gray-500 uppercase tracking-widest block mb-2 font-black">Asset</label>
+        {/* Asset selection container */}
+        <div className="mb-6">
+          <label className="text-[9px] text-gray-700 uppercase font-header font-black tracking-[0.2em] block mb-3">Asset Matrix</label>
           <div className="relative">
             <select
               value={isPreset ? selectedAsset : "custom"}
               onChange={e => onAssetChange(e.target.value)}
-              className="w-full p-3 bg-black/60 border border-white/10 rounded-xl focus:outline-none focus:border-[#D4AF37]/50 text-white transition-all text-sm font-bold appearance-none cursor-pointer"
+              className="w-full p-4 bg-black/80 border border-white/10 rounded-none focus:outline-none focus:border-[#f0c040]/50 text-white transition-all text-[11px] font-header font-black tracking-[0.1em] appearance-none cursor-pointer uppercase"
             >
               {categories.map(cat => (
-                <optgroup key={cat} label={cat.toUpperCase()} className="bg-[#050505] text-[#D4AF37]">
+                <optgroup key={cat} label={cat.toUpperCase()} className="bg-[#020205] text-[#f0c040]">
                   {ASSETS.filter(a => a.category === cat).map(asset => (
                     <option key={asset.symbol} value={asset.symbol} className="text-white">{asset.name}</option>
                   ))}
@@ -203,82 +200,85 @@ export default function OrderPanel({
               ))}
               {!isPreset && <option value="custom">{selectedAsset}</option>}
             </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
-              <ShieldCheck size={13} />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#f0c040]">
+              <ShieldCheck size={14} />
             </div>
           </div>
         </div>
 
-        {/* Lot size */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <label className="text-[10px] text-gray-500 uppercase tracking-widest font-black">Size (LOT)</label>
-            <div className="flex gap-1">
+        {/* Lot size implementation */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <label className="text-[9px] text-gray-700 uppercase font-header font-black tracking-[0.2em]">Position Size (LOT)</label>
+            <div className="flex gap-2">
               {["25", "50", "MAX"].map(pc => (
                 <button key={pc}
                   onClick={() => {
                     const factor = pc === "MAX" ? 1 : parseFloat(pc) / 100;
                     setLot(((balance * 5 * factor) / (currentPrice || 1)).toFixed(2));
                   }}
-                  className="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/5 border border-white/10 hover:bg-[#D4AF37]/20 hover:text-[#D4AF37] transition-all"
+                  className="text-[8px] font-header font-black px-2 py-1 bg-white/5 border border-white/10 hover:border-[#f0c040]/40 hover:text-[#f0c040] transition-all uppercase"
                 >
                   {pc === "MAX" ? "MAX" : `${pc}%`}
                 </button>
               ))}
             </div>
           </div>
-          <input
-            type="number" step="0.01" value={lot}
-            onChange={e => setLot(e.target.value)}
-            className={`w-full p-3 bg-black/50 border rounded-xl focus:outline-none transition-all font-mono text-2xl font-black text-center ${isHighRisk ? "border-[#FF3131] text-[#FF3131]" : "border-white/5 focus:border-[#D4AF37] text-white"}`}
-          />
-          {/* Risk bar */}
-          <div className="mt-3 p-3 bg-black/40 border border-white/5 rounded-xl">
-            <div className="flex justify-between text-[9px] font-bold mb-2">
-              <span className="text-gray-600 uppercase tracking-widest">Risk Profile</span>
-              <span className={isHighRisk ? "text-[#FF3131] font-black" : "text-gray-400"}>
-                {(riskRatio * 100).toFixed(1)}% Cap
+          <div className="relative group">
+            <input
+              type="number" step="0.01" value={lot}
+              onChange={e => setLot(e.target.value)}
+              className={`w-full p-5 bg-black/80 border rounded-none focus:outline-none transition-all font-mono text-4xl font-black text-center ${isHighRisk ? "border-[#ff1744] text-[#ff1744] shadow-[0_0_20px_rgba(255,23,68,0.1)]" : "border-white/10 focus:border-[#f0c040]/50 text-white"}`}
+            />
+          </div>
+          
+          {/* Risk profile matrix */}
+          <div className="mt-4 p-5 bg-white/[0.01] border border-white/5">
+            <div className="flex justify-between text-[9px] font-header font-black mb-3">
+              <span className="text-gray-700 uppercase tracking-[0.2em]">Risk Exposure</span>
+              <span className={isHighRisk ? "text-[#ff1744]" : "text-[#f0c040]"}>
+                {(riskRatio * 100).toFixed(1)}% CAP
               </span>
             </div>
-            <div className="w-full h-1.5 bg-[#0a0a0a] rounded-full overflow-hidden mb-2">
+            <div className="w-full h-[2px] bg-white/5 overflow-hidden mb-4">
               <motion.div
                 animate={{ width: `${Math.min(riskRatio * 100, 100)}%` }}
-                className={`h-full ${isHighRisk ? "bg-[#FF3131] shadow-[0_0_8px_#FF3131]" : "bg-[#D4AF37] shadow-[0_0_8px_#D4AF37]"}`}
+                className={`h-full ${isHighRisk ? "bg-[#ff1744] shadow-[0_0_10px_#ff1744]" : "bg-[#f0c040] shadow-[0_0_10px_#f0c040]"}`}
               />
             </div>
-            <div className="flex justify-between text-[9px]">
-              <span className="text-gray-600 uppercase">Margin Req.</span>
-              <span className="text-white font-mono">${marginRequired.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <div className="flex justify-between text-[9px] font-mono">
+              <span className="text-gray-700 uppercase">Margin Requirement</span>
+              <span className="text-white font-black">${marginRequired.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
             {isHighRisk && (
-              <div className="mt-2 text-[8px] text-[#FF3131] font-black uppercase flex items-center gap-1 border-t border-[#FF3131]/10 pt-2 animate-pulse">
-                <AlertCircle size={10} /> Liquidation exposure critical
+              <div className="mt-4 text-[9px] text-[#ff1744] font-header font-black uppercase flex items-center justify-center gap-2 border border-[#ff1744]/20 py-2 animate-pulse bg-[#ff1744]/5">
+                <AlertCircle size={11} /> Margin Critical Warning
               </div>
             )}
           </div>
         </div>
 
-        {/* ─── Trailing Stop Loss ─────────────────────────────── */}
-        <div className={`mb-4 p-3 rounded-xl border transition-all ${isTrailing ? "border-[#D4AF37]/40 bg-[#D4AF37]/5 trailing-active" : "border-white/5 bg-black/40"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className={`w-1.5 h-1.5 rounded-full ${isTrailing ? "bg-[#D4AF37] animate-pulse" : "bg-gray-700"}`} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">Trailing Stop Loss</span>
+        {/* Trailing components */}
+        <div className={`mb-4 p-4 border transition-all ${isTrailing ? "border-[#f0c040]/50 bg-[#f0c040]/5" : "border-white/5 bg-white/[0.01]"}`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-1.5 h-1.5 rounded-full ${isTrailing ? "bg-[#f0c040] shadow-[0_0_8px_#f0c040] animate-pulse" : "bg-gray-800"}`} />
+              <span className="text-[10px] font-header font-black uppercase tracking-[0.2em] text-white">Trailing Protocol</span>
             </div>
-            <button onClick={() => setIsTrailing(prev => !prev)} className="transition-colors">
+            <button onClick={() => setIsTrailing(prev => !prev)} className="group">
               {isTrailing
-                ? <ToggleRight size={22} className="text-[#D4AF37]" />
-                : <ToggleLeft  size={22} className="text-gray-600" />
+                ? <ToggleRight size={24} className="text-[#f0c040]" />
+                : <ToggleLeft  size={24} className="text-gray-800 group-hover:text-gray-600" />
               }
             </button>
           </div>
           {isTrailing ? (
             <div className="flex items-center justify-between">
-              <p className="text-[9px] text-[#D4AF37]/80 font-bold">SL trails price up by:</p>
+              <p className="text-[9px] text-[#f0c040]/80 font-mono uppercase tracking-widest">Offset Step:</p>
               <select
                 value={trailPercent}
                 onChange={e => setTrailPercent(parseFloat(e.target.value))}
-                className="text-[10px] font-black font-mono bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg px-2 py-0.5 outline-none cursor-pointer"
+                className="text-[10px] font-mono font-black bg-black border border-[#f0c040]/30 text-[#f0c040] px-2 py-0.5 outline-none cursor-pointer"
               >
                 {[0.5, 1, 1.5, 2].map(p => (
                   <option key={p} value={p}>{p}%</option>
@@ -286,70 +286,59 @@ export default function OrderPanel({
               </select>
             </div>
           ) : (
-            <p className="text-[9px] text-gray-600">Enable to lock profits as price rises</p>
+            <p className="text-[9px] text-gray-700 font-mono uppercase tracking-widest leading-loose">Automated Profit Capture Inactive</p>
           )}
         </div>
 
-        {/* ─── Brokerage & GST Toggle ──────────────────────────── */}
-        <div className={`mb-2 p-3 rounded-xl border transition-all ${brokerageEnabled ? "border-[#FF3131]/20 bg-[#FF3131]/3" : "border-white/5 bg-black/40"}`}>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">Brokerage & GST</span>
-              <span className="text-[8px] bg-[#FF3131]/10 text-[#FF3131] border border-[#FF3131]/20 rounded px-1 py-0.5 font-black uppercase">
-                Realistic
-              </span>
-            </div>
-            <button onClick={() => setBrokerageEnabled(prev => !prev)} className="transition-colors">
+        {/* Fee structure transparency */}
+        <div className={`p-4 border transition-all ${brokerageEnabled ? "border-[#ff1744]/30 bg-[#ff1744]/3" : "border-white/5 bg-white/[0.01]"}`}>
+          <div className="flex items-center justify-between mb-3">
+             <span className="text-[10px] font-header font-black uppercase tracking-[0.2em] text-white">Simulation Fidelity</span>
+             <button onClick={() => setBrokerageEnabled(prev => !prev)}>
               {brokerageEnabled
-                ? <ToggleRight size={20} className="text-[#FF3131]" />
-                : <ToggleLeft  size={20} className="text-gray-600" />
+                ? <ToggleRight size={20} className="text-[#ff1744]" />
+                : <ToggleLeft  size={20} className="text-gray-800" />
               }
             </button>
           </div>
-          {brokerageEnabled && fees && tradeValue > 0 && (
-            <div>
-              <div className="fee-row"><span>STT (0.1%)</span><span>-${fees.stt.toFixed(3)}</span></div>
-              <div className="fee-row"><span>Brokerage (₹20 cap)</span><span>-${fees.brokerage.toFixed(2)}</span></div>
-              <div className="fee-row"><span>GST (18%)</span><span>-${fees.gst.toFixed(3)}</span></div>
-              <div className="fee-row fee-total"><span>TOTAL FEES</span><span>-${fees.total.toFixed(2)}</span></div>
+          {brokerageEnabled && fees && tradeValue > 0 ? (
+            <div className="flex flex-col gap-2 border-t border-white/5 pt-3">
+              <div className="flex justify-between text-[9px] font-mono text-gray-600 uppercase"><span>STT [0.1%]</span><span className="text-[#ff1744]">-${fees.stt.toFixed(2)}</span></div>
+              <div className="flex justify-between text-[9px] font-mono text-gray-600 uppercase"><span>Brokerage Matrix</span><span className="text-[#ff1744]">-${fees.brokerage.toFixed(2)}</span></div>
+              <div className="flex justify-between text-[9px] font-mono text-gray-800 font-black pt-1 border-t border-white/5"><span>Total Yield Cost</span><span className="text-[#ff1744]">-${fees.total.toFixed(2)}</span></div>
             </div>
-          )}
-          {brokerageEnabled && tradeValue === 0 && (
-            <p className="text-[9px] text-gray-600 italic">Enter lot size to see fee breakdown</p>
-          )}
-          {!brokerageEnabled && (
-            <p className="text-[9px] text-gray-600">Paper trading — no fees applied</p>
+          ) : (
+             <p className="text-[9px] text-gray-700 font-mono uppercase tracking-widest">{brokerageEnabled ? "Re-calibrating Neural Links..." : "Zero-cost alpha mode active"}</p>
           )}
         </div>
       </div>
 
-      {/* ─── Execute Buttons ─────────────────────────────────── */}
-      <div className="flex flex-col gap-3 pt-3 border-t border-white/5">
-        <div className="grid grid-cols-2 gap-3">
+      {/* Primary Action Suite */}
+      <div className="flex flex-col gap-4 pt-6 border-t border-white/5 bg-[#020205]">
+        <div className="grid grid-cols-2 gap-4">
           <motion.button
-            whileTap={{ scale: 0.96 }}
+            whileTap={{ scale: 0.97 }}
             onClick={e => handleTrade("BUY", e)}
             disabled={loading || isLocked}
-            className="group relative overflow-hidden bg-[#00FF94] hover:brightness-110 disabled:opacity-50 text-black font-black tracking-[0.15em] uppercase transition-all p-4 rounded-2xl text-[11px] h-16 flex flex-col items-center justify-center gap-0.5"
+            className="group relative overflow-hidden bg-[#00e676] hover:brightness-110 disabled:opacity-30 text-black font-header font-black tracking-[0.2em] uppercase transition-all py-5 border-none shadow-[0_10px_30px_rgba(0,230,118,0.15)] flex flex-col items-center justify-center gap-1"
           >
-            <div className="absolute top-0 left-0 w-full h-1 bg-white/20" />
             <span className="text-[13px]">BULLISH</span>
-            <span className="text-[9px]">Initiate Long</span>
+            <span className="text-[8px] opacity-60">Long α</span>
           </motion.button>
           <motion.button
-            whileTap={{ scale: 0.96 }}
+            whileTap={{ scale: 0.97 }}
             onClick={e => handleTrade("SELL", e)}
             disabled={loading || isLocked}
-            className="group relative overflow-hidden bg-[#FF3131] hover:brightness-110 disabled:opacity-50 text-white font-black tracking-[0.15em] uppercase transition-all p-4 rounded-2xl text-[11px] h-16 flex flex-col items-center justify-center gap-0.5 shadow-[0_4px_20px_rgba(255,49,49,0.2)]"
+            className="group relative overflow-hidden bg-[#ff1744] hover:brightness-110 disabled:opacity-30 text-white font-header font-black tracking-[0.2em] uppercase transition-all py-5 border-none shadow-[0_10px_30px_rgba(255,23,68,0.15)] flex flex-col items-center justify-center gap-1"
           >
-            <div className="absolute top-0 left-0 w-full h-1 bg-white/10" />
             <span className="text-[13px]">BEARISH</span>
-            <span className="text-[9px]">Initiate Short</span>
+            <span className="text-[8px] opacity-60">Short β</span>
           </motion.button>
         </div>
-        <div className="flex items-center justify-center gap-2 opacity-20">
-          <ShieldCheck size={9} className="text-gray-500" />
-          <span className="text-[8px] uppercase tracking-[0.3em] font-black">Apex Institutional V5</span>
+        <div className="flex items-center justify-center gap-4 opacity-30 group cursor-none">
+          <div className="h-px w-8 bg-gray-800 group-hover:bg-[#f0c040] transition-all" />
+          <span className="text-[8px] uppercase tracking-[0.6em] font-header font-black text-white group-hover:text-[#f0c040] transition-all">Sovereign Elite Tier Active</span>
+          <div className="h-px w-8 bg-gray-800 group-hover:bg-[#f0c040] transition-all" />
         </div>
       </div>
     </div>

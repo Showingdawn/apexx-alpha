@@ -81,21 +81,22 @@ export default function Navbar() {
       <div className="flex items-center gap-6">
         {user ? (
           <>
-            <Link href="/trade" className="text-gray-400 hover:text-white transition font-bold text-xs uppercase tracking-widest">Trade</Link>
-            <Link href="/portfolio" className="text-gray-400 hover:text-white transition font-bold text-xs uppercase tracking-widest">Portfolio</Link>
-            <Link href="/performance" className="text-gray-400 hover:text-white transition font-bold text-xs uppercase tracking-widest">DNA</Link>
-            <div className="h-5 w-px bg-[#1a1a1a] mx-2"></div>
+            <Link href="/trade" className="text-white/60 hover:text-[#f0c040] transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Trade</Link>
+            <Link href="/portfolio" className="text-white/60 hover:text-[#f0c040] transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Vault</Link>
+            <Link href="/performance" className="text-white/60 hover:text-[#f0c040] transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Audit</Link>
+            <Link href="/ib" className="text-[#f0c040] hover:brightness-125 transition font-header font-black text-[10px] uppercase tracking-[0.2em] border-b border-[#f0c040]/30 py-1">Partner</Link>
+            <div className="h-5 w-px bg-white/10 mx-2"></div>
             <button 
               onClick={handleLogout} 
-              className="text-[#D4AF37] hover:bg-[#D4AF37]/10 font-bold text-xs border border-[#D4AF37]/30 px-4 py-2 rounded-lg transition-all uppercase tracking-widest"
+              className="text-[#f0c040] hover:bg-[#f0c040]/10 font-header font-black text-[10px] border border-[#f0c040]/30 px-6 py-2.5 rounded-none transition-all uppercase tracking-[0.2em]"
             >
-              Log Out
+              Terminate Session
             </button>
           </>
         ) : (
           <>
-            <Link href="/login" className="text-gray-400 hover:text-white transition font-bold text-xs uppercase tracking-widest">Log In</Link>
-            <Link href="/signup" className="bg-[#D4AF37] hover:brightness-110 text-black px-5 py-2 rounded-lg font-black text-xs uppercase tracking-widest transition-all">Sign Up</Link>
+            <Link href="/login" className="text-white/60 hover:text-white transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Log In</Link>
+            <Link href="/signup" className="glass-panel text-white px-8 py-2.5 font-header font-black text-[10px] uppercase tracking-[0.2em] transition-all border-[#f0c040]/30 hover:border-[#f0c040]">Sign Up</Link>
           </>
         )}
       </div>

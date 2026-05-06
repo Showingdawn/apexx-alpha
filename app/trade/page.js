@@ -1,18 +1,19 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "@/components/Navbar";
-import Chart from "@/components/Chart";
 import OrderPanel from "@/components/OrderPanel";
+import Chart from "@/components/Chart";
 import TradeHistory from "@/components/TradeHistory";
+import MarketDepth from "@/components/MarketDepth";
 import StatsBar from "@/components/StatsBar";
-import GlobalTicker from "@/components/GlobalTicker";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import TopBarTicker from "@/components/TopBarTicker";
 import Watchlist from "@/components/Watchlist";
 import GrowwSearch from "@/components/GrowwSearch";
 import PortfolioHeatmap from "@/components/PortfolioHeatmap";
 import TraderConsole from "@/components/TraderConsole";
-import MarketDepth from "@/components/MarketDepth";
 import CommandBar from "@/components/CommandBar";
-import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
@@ -63,7 +64,7 @@ export default function TradePage() {
       if (!auth.currentUser) return;
       try {
         const token = await auth.currentUser.getIdToken();
-        const res = await axios.get("http://localhost:3001/api/user/", {
+        const res = await axios.get("/api/user/", {
           headers: { Authorization: `Bearer ${token}` }
         });
         setBalance(res.data.balance);
@@ -80,7 +81,7 @@ export default function TradePage() {
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        const res = await axios.get(`http://localhost:3001/api/market/snapshot?symbol=${encodeURIComponent(selectedAsset)}`);
+        const res = await axios.get(`/api/market/snapshot?symbol=${encodeURIComponent(selectedAsset)}`);
         setCurrentPrice(res.data.price);
         setMarketAnalytics({
           recommendation: res.data.recommendationMean,
@@ -133,7 +134,7 @@ export default function TradePage() {
     if (!target) return;
     try {
       const token = await auth.currentUser.getIdToken();
-      const res = await axios.post(`http://localhost:3001/api/trade/close/${target.id}`, {}, {
+      const res = await axios.post(`/api/trade/close/${target.id}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOptimisticTrades(prev => prev.map(t => t.id === target.id ? { ...t, status: 'CLOSED', pnl: res.data.pnl || -100 } : t));
@@ -161,32 +162,68 @@ export default function TradePage() {
       case "splitoff":   setSplitMode(null); break;
       case "theme":      document.documentElement.classList.toggle("dark"); break;
       case "reset":      
-        axios.post("http://localhost:3001/api/user/reset", {}, { headers: { Authorization: `Bearer ${auth.currentUser?.accessToken}` } })
+        axios.post("/api/user/reset", {}, { headers: { Authorization: `Bearer ${auth.currentUser?.accessToken}` } })
              .then(r => setBalance(r.data.balance));
         break;
       case "selectAsset": handleAssetChange(payload); break;
     }
   };
 
+  // Container Variants for Staggered Load
+  const terminalVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        staggerChildren: 0.1,
+        delayChildren: 0.2
+      } 
+    }
+  };
+
+  const navVariants = {
+    hidden: { y: -100, opacity: 0 },
+    visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100, damping: 20 } }
+  };
+
+  const sidebarVariants = {
+    hidden: { x: -300, opacity: 0 },
+    visible: { x: 0, opacity: 1, transition: { type: "spring", stiffness: 100, damping: 25 } }
+  };
+
+  const mainVariants = {
+    hidden: { scale: 0.98, opacity: 0 },
+    visible: { scale: 1, opacity: 1, transition: { duration: 0.8, ease: [0.23, 1, 0.32, 1] } }
+  };
+
+  const [isVibrating, setIsVibrating] = useState(false);
+  const triggerHaptic = () => {
+    setIsVibrating(true);
+    setTimeout(() => setIsVibrating(false), 300);
+  };
+
+  // Modify handleFlashTrade to include haptic
+  const baseFlashTrade = handleFlashTrade;
+  const wrappedFlashTrade = async () => {
+    triggerHaptic();
+    await baseFlashTrade();
+  };
+
   return (
     <motion.div 
-      animate={{ 
-        filter: impactActive ? "grayscale(1) contrast(1.2)" : "grayscale(0) contrast(1)",
-        backgroundColor: impactActive ? "#000000" : "#050505"
-      }}
-      transition={{ duration: 0.4 }}
-      className="min-h-screen flex text-[#eaecef] overflow-hidden selection:bg-[#D4AF37]/30"
+      initial="hidden"
+      animate="visible"
+      variants={terminalVariants}
+      className={`min-h-screen flex text-white overflow-hidden bg-[#020205] selection:bg-[#f0c040]/30 font-body ${isVibrating ? 'haptic-vibration' : ''}`}
     >
       {/* COLUMN 1: WATCHLIST */}
       <AnimatePresence>
         {!zenMode && (
           <motion.div
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
+            variants={sidebarVariants}
             className="hidden xl:block"
           >
-            <Watchlist onAssetSelect={handleAssetChange} onAction={(type, symbol) => handleAssetChange(symbol)} />
+            <Watchlist onAssetSelect={handleAssetChange} onAction={(type, symbol) => { triggerHaptic(); handleAssetChange(symbol); }} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -195,7 +232,10 @@ export default function TradePage() {
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* UNIFIED HEADER BAR */}
         {!zenMode && (
-          <div className="px-6 py-3 border-b border-white/5 flex items-center justify-between gap-12 bg-black/60 backdrop-blur-2xl z-50">
+          <motion.div 
+            variants={navVariants}
+            className="px-6 py-4 border-b border-white/5 flex items-center justify-between gap-12 bg-black/60 backdrop-blur-2xl z-50"
+          >
              <div className="flex-shrink-0">
                 <Navbar />
              </div>
@@ -207,23 +247,29 @@ export default function TradePage() {
              <div className="flex items-center gap-6 flex-shrink-0">
                 <StatsBar balance={balance} setBalance={setBalance} />
              </div>
-          </div>
+          </motion.div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-[#050505]/50">
-          <div className="flex flex-col gap-6 max-w-[1600px] mx-auto w-full">
+        <motion.div 
+          variants={mainVariants}
+          className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-[#020205]/50 relative"
+        >
+          {/* Scanline overlay for trade floor */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03] scanlines" />
+
+          <div className="flex flex-col gap-8 max-w-[1800px] mx-auto w-full relative z-10">
             
-            {/* Contextual Market Pulse (Unified Ticker) */}
+            {/* Contextual Market Pulse (Sovereign Top Ticker) */}
             {!zenMode && (
-              <div className="py-2 border-b border-white/5">
-                <GlobalTicker />
+              <div className="py-1 border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-[100]">
+                <TopBarTicker />
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               {/* CENTER COLUMN: CHART & INSIGHTS (8 cols) */}
-              <div className="lg:col-span-8 flex flex-col gap-6">
-                <div className="h-[600px] glass-panel border-white/5 overflow-hidden">
+              <div className="lg:col-span-8 flex flex-col gap-8">
+                <div className="h-[640px] glass-panel border-white/10 overflow-hidden shadow-2xl">
                   <Chart 
                     selectedAsset={selectedAsset} 
                     onAssetSearch={handleAssetChange} 
@@ -237,50 +283,62 @@ export default function TradePage() {
                 </div>
                 
                 {/* Insights Dual Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <PortfolioHeatmap trades={optimisticTrades} />
-                   <MarketDepth price={currentPrice} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="glass-panel p-6 border-white/10 hover:border-[#f0c040]/30 transition-all">
+                      <PortfolioHeatmap trades={optimisticTrades} />
+                   </div>
+                   <div className="glass-panel p-6 border-white/10 hover:border-[#f0c040]/30 transition-all">
+                      <MarketDepth price={currentPrice} />
+                   </div>
                 </div>
 
-                <div className="glass-panel border-white/5">
+                <div className="glass-panel border-white/10 shadow-2xl">
                    <TradeHistory optimisticTrades={optimisticTrades} setOptimisticTrades={setOptimisticTrades} />
                 </div>
               </div>
 
               {/* RIGHT COLUMN: EXECUTION (4 cols) */}
-              <div className="lg:col-span-4 flex flex-col gap-6 sticky top-0">
-                <OrderPanel 
-                  setOptimisticTrades={setOptimisticTrades} 
-                  selectedAsset={selectedAsset}
-                  onAssetChange={handleAssetChange} 
-                  slPrice={slPrice}
-                  tpPrice={tpPrice}
-                  setSlPrice={setSlPrice}
-                  setTpPrice={setTpPrice}
-                  balance={balance}
-                  currentPrice={currentPrice}
-                  isLocked={isLocked}
-                  lockTime={lockTime}
-                  isTrailing={isTrailing}
-                  setIsTrailing={setIsTrailing}
-                />
+              <div className="lg:col-span-4 flex flex-col gap-8 sticky top-0">
+                <div className="glass-panel border-white/10 p-1 shadow-2xl">
+                  <OrderPanel 
+                    setOptimisticTrades={setOptimisticTrades} 
+                    selectedAsset={selectedAsset}
+                    onAssetChange={handleAssetChange} 
+                    slPrice={slPrice}
+                    tpPrice={tpPrice}
+                    setSlPrice={setSlPrice}
+                    setTpPrice={setTpPrice}
+                    balance={balance}
+                    currentPrice={currentPrice}
+                    isLocked={isLocked}
+                    lockTime={lockTime}
+                    isTrailing={isTrailing}
+                    setIsTrailing={setIsTrailing}
+                    onTrade={triggerHaptic}
+                  />
+                </div>
                 
-                <TraderConsole history={optimisticTrades} />
+                <div className="glass-panel border-white/10 shadow-2xl h-full">
+                  <TraderConsole history={optimisticTrades} />
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {zenMode && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed bottom-6 right-8 text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37] bg-black/50 border border-[#D4AF37]/30 px-4 py-2 rounded-full backdrop-blur-md"
-        >
-          Zen Mode Active // Cmd+K to Exit
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {zenMode && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 right-8 text-[11px] font-header font-black uppercase tracking-[0.4em] text-[#f0c040] glass-panel bg-black/50 px-6 py-3 rounded-none shadow-[0_0_40px_rgba(0,0,0,0.8)]"
+          >
+            Terminal Mode: Zen Alpha // [ESC] to Abort
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       <CommandBar 
         isOpen={cmdOpen} 

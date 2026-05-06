@@ -26,7 +26,7 @@ export default function GrowwSearch({ onSelect }) {
       if (query.trim().length > 1) {
         setLoading(true);
         try {
-          const res = await axios.get(`http://localhost:3001/api/market/search?q=${encodeURIComponent(query)}`);
+          const res = await axios.get(`/api/market/search?q=${encodeURIComponent(query)}`);
           setResults(res.data);
           setIsOpen(true);
         } catch (e) {
