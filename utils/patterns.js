@@ -142,6 +142,42 @@ export function detectPatterns(candles) {
   return null;
 }
 
+export function calculateSupportResistance(candles) {
+  if (!candles || candles.length === 0) return { resY: 20, supY: 80, resistance: 0, support: 0 };
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const maxHigh = Math.max(...highs);
+  const minLow = Math.min(...lows);
+  const spread = maxHigh - minLow || 1;
+  
+  const sortedHighs = [...highs].sort((a,b) => b - a);
+  const sortedLows = [...lows].sort((a,b) => a - b);
+  
+  const resistance = sortedHighs.slice(0, 3).reduce((acc, v) => acc + v, 0) / 3;
+  const support = sortedLows.slice(0, 3).reduce((acc, v) => acc + v, 0) / 3;
+  
+  const resY = ((maxHigh - resistance) / spread) * 100;
+  const supY = ((maxHigh - support) / spread) * 100;
+  
+  return { resY, supY, resistance, support };
+}
+
+export const MENTOR_BRIEFINGS = {
+  "1m": "Briefing: High-volatility scalping. Move quickly. Look for patterns like the 'Hammer' to buy the 'floor'.",
+  "15m": "Briefing: Local trend validation. Keep stop-loss tight and monitor Break of Structure (BOS).",
+  "1h": "Briefing: Local trend validation. Keep stop-loss tight and monitor Break of Structure (BOS).",
+  "4h": "Briefing: Institutional trend following. Patience required. Look for 'Order Blocks' to find where major funds are entering.",
+  "1D": "Briefing: Institutional trend following. Patience required. Look for 'Order Blocks' to find where major funds are entering."
+};
+
+export const BRIEFINGS = {
+  "1m": "1m Timeframe engaged. Orderbook volatility is elevated. Scalping parameters active.",
+  "15m": "15m Timeframe engaged. Trend confirmations required. Swing parameters active.",
+  "1h": "1h Timeframe engaged. Swing indicators active. Target key liquidity sweeps.",
+  "4h": "4h Timeframe engaged. Institutional order blocks detected. Macro trend active.",
+  "1D": "1D Timeframe engaged. Long-term distribution matrices active."
+};
+
 // Pre-generated 15 candles to overlay on the chart for interactive scanning
 export const MOCK_CHART_CANDLES = [
   { open: 100, high: 105, low: 98, close: 104 }, // 0

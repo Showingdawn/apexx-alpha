@@ -39,6 +39,8 @@ export default function TradePage() {
   const [highestSinceOpen, setHighestSinceOpen] = useState(0);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [splitMode, setSplitMode] = useState(null);
+  const [isMentorMode, setIsMentorMode] = useState(false);
+  const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const router = useRouter();
 
   // Daily P&L Tracker
@@ -335,6 +337,10 @@ export default function TradePage() {
                   splitMode={splitMode}
                   onSplitChange={setSplitMode}
                   setActiveInsight={setActiveInsight}
+                  isMentorMode={isMentorMode}
+                  setIsMentorMode={setIsMentorMode}
+                  activeTimeframe={activeTimeframe}
+                  setActiveTimeframe={setActiveTimeframe}
                 />
               </div>
 
