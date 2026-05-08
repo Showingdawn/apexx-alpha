@@ -211,15 +211,8 @@ export default function Chart({
   };
 
   useEffect(() => {
-    if (splitMode || !scriptLoaded || !window.TradingView || !containerRef.current) return;
-    containerRef.current.innerHTML = "";
-    new window.TradingView.widget({
-      ...TV_CONFIG,
-      interval: mapTimeframeToInterval(activeTimeframe),
-      symbol: mapToTVSymbol(selectedAsset),
-      container_id: "tv_chart_single",
-    });
-  }, [selectedAsset, scriptLoaded, splitMode, activeTimeframe]);
+    // Handled smoothly via hardware-accelerated native React iframe components
+  }, [selectedAsset, activeTimeframe]);
 
   const handleSearch = () => {
     if (!searchInput.trim()) return;
@@ -612,7 +605,11 @@ export default function Chart({
               </motion.div>
             )}
 
-            <div id="tv_chart_single" ref={containerRef} className="w-full h-full bg-transparent" />
+            <iframe
+              src={`https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(mapToTVSymbol(selectedAsset))}&interval=${mapTimeframeToInterval(activeTimeframe)}&theme=dark&style=1&timezone=exchange&toolbarbg=050505&gridcolor=rgba(212,175,55,0.03)`}
+              className="w-full h-full border-none bg-transparent"
+              style={{ backgroundColor: "#050505" }}
+            />
             
             {/* Holographic Scanner Overlay */}
             <div 
