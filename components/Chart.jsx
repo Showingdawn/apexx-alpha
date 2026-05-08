@@ -707,7 +707,12 @@ export default function Chart({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     className="absolute z-50 bg-black/95 border border-[#FFBF00]/30 p-4 rounded-xl shadow-[0_0_25px_rgba(255,191,0,0.25)] pointer-events-none font-mono max-w-[280px]"
-                    style={{ left: Math.min(mousePos.x + 15, containerRef.current?.getBoundingClientRect().width - 300), top: mousePos.y - 140 }}
+                    style={{
+                      left: !isNaN(mousePos.x)
+                        ? Math.min(mousePos.x + 15, (containerRef.current ? containerRef.current.getBoundingClientRect().width : 800) - 300)
+                        : 15,
+                      top: !isNaN(mousePos.y) ? mousePos.y - 140 : 15
+                    }}
                   >
                     {isMentorMode ? (
                       <div className="flex flex-col gap-1.5">
