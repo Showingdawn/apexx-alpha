@@ -39,8 +39,6 @@ export default function TradePage() {
   const [highestSinceOpen, setHighestSinceOpen] = useState(0);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [splitMode, setSplitMode] = useState(null);
-  const [isMentorMode, setIsMentorMode] = useState(false);
-  const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const router = useRouter();
 
   // Daily P&L Tracker
@@ -82,7 +80,7 @@ export default function TradePage() {
     if (localTrades) {
       try {
         setOptimisticTrades(JSON.parse(localTrades));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const fetchBalance = async () => {
@@ -133,8 +131,8 @@ export default function TradePage() {
         setHighestSinceOpen(currentPrice);
         if (slPrice > 0 && highestSinceOpen > 0) {
           const movePercent = (currentPrice - highestSinceOpen) / highestSinceOpen;
-          if (movePercent > 0.005) { 
-             setSlPrice(prev => prev * (1 + movePercent));
+          if (movePercent > 0.005) {
+            setSlPrice(prev => prev * (1 + movePercent));
           }
         }
       }, 0);
@@ -157,7 +155,7 @@ export default function TradePage() {
     localStorage.setItem("apex_local_balance", newBalance.toString());
 
     // Update optimistic trades list
-    const updatedTrades = optimisticTrades.map(t => 
+    const updatedTrades = optimisticTrades.map(t =>
       t.id === target.id ? { ...t, status: 'CLOSED', exitPrice: livePrice, pnl: localPnl } : t
     );
     setOptimisticTrades(updatedTrades);
@@ -209,14 +207,14 @@ export default function TradePage() {
   const handleCommandAction = (actionId, payload) => {
     switch (actionId) {
       case "performance": router.push("/performance"); break;
-      case "portfolio":  router.push("/portfolio"); break;
-      case "split2":     setSplitMode("2"); break;
-      case "split4":     setSplitMode("4"); break;
-      case "splitoff":   setSplitMode(null); break;
-      case "theme":      document.documentElement.classList.toggle("dark"); break;
-      case "reset":      
+      case "portfolio": router.push("/portfolio"); break;
+      case "split2": setSplitMode("2"); break;
+      case "split4": setSplitMode("4"); break;
+      case "splitoff": setSplitMode(null); break;
+      case "theme": document.documentElement.classList.toggle("dark"); break;
+      case "reset":
         axios.post("/api/user/reset", {}, { headers: { Authorization: `Bearer ${auth.currentUser?.accessToken}` } })
-             .then(r => setBalance(r.data.balance));
+          .then(r => setBalance(r.data.balance));
         break;
       case "selectAsset": handleAssetChange(payload); break;
     }
@@ -225,12 +223,12 @@ export default function TradePage() {
   // Container Variants for Staggered Load
   const terminalVariants = {
     hidden: { opacity: 0 },
-    visible: { 
+    visible: {
       opacity: 1,
-      transition: { 
+      transition: {
         staggerChildren: 0.1,
         delayChildren: 0.2
-      } 
+      }
     }
   };
 
@@ -263,7 +261,7 @@ export default function TradePage() {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial="hidden"
       animate="visible"
       variants={terminalVariants}
@@ -290,25 +288,25 @@ export default function TradePage() {
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
         {/* UNIFIED HEADER BAR */}
         {!zenMode && (
-          <motion.div 
+          <motion.div
             variants={navVariants}
             className="px-6 py-4 border-b border-white/5 flex items-center justify-between gap-12 bg-black/60 backdrop-blur-2xl z-50"
           >
-             <div className="flex-shrink-0">
-                <Navbar />
-             </div>
-             
-             <div className="flex-1 max-w-2xl">
-                <GrowwSearch onSelect={handleAssetChange} />
-             </div>
+            <div className="flex-shrink-0">
+              <Navbar />
+            </div>
 
-             <div className="flex items-center gap-6 flex-shrink-0">
-                <StatsBar balance={balance} setBalance={setBalance} optimisticTrades={optimisticTrades} />
-             </div>
+            <div className="flex-1 max-w-2xl">
+              <GrowwSearch onSelect={handleAssetChange} />
+            </div>
+
+            <div className="flex items-center gap-6 flex-shrink-0">
+              <StatsBar balance={balance} setBalance={setBalance} optimisticTrades={optimisticTrades} />
+            </div>
           </motion.div>
         )}
 
-        <motion.div 
+        <motion.div
           variants={mainVariants}
           className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-[#020205]/50 relative"
         >
@@ -316,7 +314,7 @@ export default function TradePage() {
           <div className="absolute inset-0 pointer-events-none opacity-[0.03] scanlines" />
 
           <div className="flex flex-col gap-8 max-w-[1800px] mx-auto w-full relative z-10">
-            
+
             {/* Contextual Market Pulse (Sovereign Top Ticker) */}
             {!zenMode && (
               <div className="py-1 border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-[100]">
@@ -327,9 +325,9 @@ export default function TradePage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start w-full">
               {/* TOP ROW: CHART & EXECUTION */}
               <div className="lg:col-span-8 glass-panel border-white/10 overflow-hidden shadow-2xl h-[740px]">
-                <Chart 
-                  selectedAsset={selectedAsset} 
-                  onAssetSearch={handleAssetChange} 
+                <Chart
+                  selectedAsset={selectedAsset}
+                  onAssetSearch={handleAssetChange}
                   slPrice={slPrice}
                   tpPrice={tpPrice}
                   setSlPrice={setSlPrice}
@@ -337,18 +335,14 @@ export default function TradePage() {
                   splitMode={splitMode}
                   onSplitChange={setSplitMode}
                   setActiveInsight={setActiveInsight}
-                  isMentorMode={isMentorMode}
-                  setIsMentorMode={setIsMentorMode}
-                  activeTimeframe={activeTimeframe}
-                  setActiveTimeframe={setActiveTimeframe}
                 />
               </div>
 
               <div className="lg:col-span-4 glass-panel border-white/10 shadow-2xl h-[740px] overflow-y-auto custom-scrollbar">
-                <OrderPanel 
-                  setOptimisticTrades={setOptimisticTrades} 
+                <OrderPanel
+                  setOptimisticTrades={setOptimisticTrades}
                   selectedAsset={selectedAsset}
-                  onAssetChange={handleAssetChange} 
+                  onAssetChange={handleAssetChange}
                   slPrice={slPrice}
                   tpPrice={tpPrice}
                   setSlPrice={setSlPrice}
@@ -376,7 +370,7 @@ export default function TradePage() {
 
       <AnimatePresence>
         {zenMode && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -386,11 +380,11 @@ export default function TradePage() {
           </motion.div>
         )}
       </AnimatePresence>
-      
-      <CommandBar 
-        isOpen={cmdOpen} 
-        onClose={() => setCmdOpen(false)} 
-        onAction={handleCommandAction} 
+
+      <CommandBar
+        isOpen={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        onAction={handleCommandAction}
       />
     </motion.div>
   );
