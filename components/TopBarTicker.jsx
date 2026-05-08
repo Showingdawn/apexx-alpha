@@ -42,7 +42,7 @@ export default function TopBarTicker() {
       
       {SYMBOLS.map(s => {
         const item = data[s.id];
-        if (!item) return null;
+        if (!item || item.price === undefined || item.changePercent === undefined) return null;
         const isUp = item.changePercent >= 0;
 
         return (

@@ -11,7 +11,7 @@ export default function ClientSetup() {
       (error) => {
         const isLocal = window.location.hostname === 'localhost';
         
-        console.error(`[Sovereign-System] Neural Link Interference:\nStatus: ${error.response?.status}\nPath: ${error.config?.url}\nMessage: ${error.response?.data?.error || error.message}`);
+        console.warn(`[Sovereign-System] Neural Link Interference:\nStatus: ${error.response?.status}\nPath: ${error.config?.url}\nMessage: ${error.response?.data?.error || error.message}`);
 
         // Suppress 403 & 404 & 500 error popups to maintain 'Institutional' feel
         // unless they are critical trade errors (which usually have specific handling)

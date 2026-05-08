@@ -4,7 +4,9 @@ import { auth } from "@/lib/firebase";
 import axios from "axios";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, TrendingUp, TrendingDown, Zap } from "lucide-react";
+import { Brain, TrendingUp, TrendingDown, Zap, Download } from "lucide-react";
+import { playMechanicalClick } from "@/utils/sound";
+import toast from "react-hot-toast";
 
 // ─── Inline SVG Sparkline ──────────────────────────────
 function SVGSparkline({ data, isProfit, entryPrice, width = 80, height = 32 }) {
@@ -117,6 +119,49 @@ export default function TradeHistory({ optimisticTrades = [], setOptimisticTrade
   const [ledgerTab, setLedgerTab] = useState("ALL"); // "ALL" | "OPEN" | "CLOSED"
   const [selectedFeedbackTradeId, setSelectedFeedbackTradeId] = useState(null);
 
+  const exportLedgerCSV = () => {
+    if (!optimisticTrades || optimisticTrades.length === 0) {
+      toast.error("No trades available inside the ledger to export.", { id: "csv-err" });
+      return;
+    }
+    playMechanicalClick();
+    
+    const headers = ["id", "symbol", "type", "leverage", "entryPrice", "closePrice", "pnl", "timestamp"];
+    const rows = optimisticTrades.map(trade => {
+      let pnlValue = parseFloat(trade.pnl) || 0;
+      if (trade.status === "OPEN") {
+        const livePrice = marketPrices[trade.asset] || trade.entryPrice || 0;
+        const spread = trade.type === "BUY"
+          ? livePrice - trade.entryPrice
+          : trade.entryPrice - livePrice;
+        pnlValue = spread * (trade.lot || 0);
+      }
+      return [
+        `"${trade.id || ""}"`,
+        `"${trade.asset || ""}"`,
+        `"${trade.type || ""}"`,
+        `"${trade.leverage || 1}x"`,
+        trade.entryPrice || 0,
+        trade.closePrice || marketPrices[trade.asset] || trade.entryPrice || 0,
+        pnlValue.toFixed(2),
+        `"${trade.createdAt || new Date().toISOString()}"`
+      ];
+    });
+    
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+      
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "apex_trading_ledger.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success("Trading ledger successfully exported to apex_trading_ledger.csv!");
+  };
+
   const generateAIFeedback = (trade, pnlValue) => {
     const isProfit = pnlValue >= 0;
     const leverage = trade.leverage || 1;
@@ -215,8 +260,16 @@ export default function TradeHistory({ optimisticTrades = [], setOptimisticTrade
             <p className="text-[8px] text-gray-600 font-mono uppercase tracking-widest mt-1">Real-time Strategy Verification</p>
           </div>
         </div>
-        <div className="text-[9px] glass-panel border-[#f0c040]/30 px-3 py-1.5 text-[#f0c040] font-header font-black flex items-center gap-2">
-          <Zap size={10} className="fill-[#f0c040]" /> CMC PROTOCOL V9.1
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={exportLedgerCSV}
+            className="text-[9px] bg-[#f0c040]/10 hover:bg-[#f0c040]/20 border border-[#f0c040]/30 hover:border-[#f0c040] px-3 py-1.5 text-[#f0c040] font-header font-black flex items-center gap-2 transition-all cursor-pointer rounded-sm shadow-[0_0_10px_rgba(240,192,64,0.05)] hover:shadow-[0_0_15px_rgba(240,192,64,0.2)]"
+          >
+            <Download size={10} /> EXPORT FOR POWER BI
+          </button>
+          <div className="text-[9px] glass-panel border-white/10 px-3 py-1.5 text-white/40 font-header font-black flex items-center gap-2">
+            <Zap size={10} className="fill-white/20 text-white/20" /> CMC PROTOCOL V9.1
+          </div>
         </div>
       </div>
 

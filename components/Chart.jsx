@@ -4,7 +4,7 @@ import Script from "next/script";
 import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 import { Search, Info, LayoutTemplate, Grid2X2, Square, Eye, Activity, Award, Clock, GraduationCap, BookOpen } from "lucide-react";
-import { detectPatterns, MOCK_CHART_CANDLES } from "@/utils/patterns";
+import { detectPatterns, MOCK_CHART_CANDLES, calculateSupportResistance, BRIEFINGS, MENTOR_BRIEFINGS } from "@/utils/patterns";
 
 const SYMBOL_MAP = {
   'BTC-USD':    'BINANCE:BTCUSDT',
@@ -37,21 +37,6 @@ const TV_CONFIG = {
   gridColor: "rgba(212, 175, 55, 0.03)",
 };
 
-const BRIEFINGS = {
-  "1m": "[SCALP] High-frequency noise. Monitoring micro-liquidity sweeps.",
-  "15m": "[INTRADAY] Trend validation in progress. Look for local Break of Structure (BOS).",
-  "1h": "[SWING] Macro-structure evolving. Institutional bias is currently dominant.",
-  "4h": "[SWING] Macro-structure evolving. Institutional bias is currently dominant.",
-  "1D": "[POSITIONAL] Major trend analysis. Aligning with long-term capital flows."
-};
-
-const MENTOR_BRIEFINGS = {
-  "1m": "Briefing: High-volatility scalping. Move quickly. Look for patterns like the 'Hammer' to buy the 'floor'.",
-  "15m": "Briefing: Local trend validation. Keep stop-loss tight and monitor Break of Structure (BOS).",
-  "1h": "Briefing: Local trend validation. Keep stop-loss tight and monitor Break of Structure (BOS).",
-  "4h": "Briefing: Institutional trend following. Patience required. Look for 'Order Blocks' to find where major funds are entering.",
-  "1D": "Briefing: Institutional trend following. Patience required. Look for 'Order Blocks' to find where major funds are entering."
-};
 
 const MENTOR_GOALS = {
   "1m": "Goal: Master high-speed candlestick volume validation to execute scalp setups.",
@@ -122,7 +107,21 @@ function PaneHeader({ symbol, onSymbolChange, paneIdx }) {
   );
 }
 
-export default function Chart({ selectedAsset, onAssetSearch, slPrice, tpPrice, setSlPrice, setTpPrice, splitMode, onSplitChange, setActiveInsight = () => {} }) {
+export default function Chart({ 
+  selectedAsset, 
+  onAssetSearch, 
+  slPrice, 
+  tpPrice, 
+  setSlPrice, 
+  setTpPrice, 
+  splitMode, 
+  onSplitChange, 
+  setActiveInsight = () => {},
+  isMentorMode = false,
+  setIsMentorMode = () => {},
+  activeTimeframe = "15m",
+  setActiveTimeframe = () => {}
+}) {
   const containerRef = useRef(null);
   const chartAreaRef = useRef(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
@@ -131,12 +130,10 @@ export default function Chart({ selectedAsset, onAssetSearch, slPrice, tpPrice, 
   const [tpY, setTpY] = useState(150);
 
   // Timeframe and Scanner states
-  const [activeTimeframe, setActiveTimeframe] = useState("15m");
   const [isScanning, setIsScanning] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [showIntelOverlay, setShowIntelOverlay] = useState(true);
-  const [isMentorMode, setIsMentorMode] = useState(false);
   const [activeIndTab, setActiveIndTab] = useState("EMA 50");
 
   // Macro Shockwave States
@@ -291,26 +288,7 @@ export default function Chart({ selectedAsset, onAssetSearch, slPrice, tpPrice, 
     };
   };
 
-  const getSRElements = () => {
-    if (!activeCandles || activeCandles.length === 0) return { resY: 20, supY: 80 };
-    const highs = activeCandles.map(c => c.high);
-    const lows = activeCandles.map(c => c.low);
-    const maxHigh = Math.max(...highs);
-    const minLow = Math.min(...lows);
-    const spread = maxHigh - minLow || 1;
-    
-    const sortedHighs = [...highs].sort((a,b) => b - a);
-    const sortedLows = [...lows].sort((a,b) => a - b);
-    
-    const resistance = sortedHighs.slice(0, 3).reduce((acc, v) => acc + v, 0) / 3;
-    const support = sortedLows.slice(0, 3).reduce((acc, v) => acc + v, 0) / 3;
-    
-    const resY = ((maxHigh - resistance) / spread) * 100;
-    const supY = ((maxHigh - support) / spread) * 100;
-    
-    return { resY, supY };
-  };
-  const { resY, supY } = getSRElements();
+  const { resY, supY } = calculateSupportResistance(activeCandles);
 
   useEffect(() => {
     if (!setActiveInsight || !isScanning) return;
