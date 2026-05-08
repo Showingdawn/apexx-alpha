@@ -47,10 +47,44 @@ const MENTOR_GOALS = {
 };
 
 function mapToTVSymbol(asset) {
+  if (!asset) return 'BINANCE:BTCUSDT';
+  const cleanAsset = asset.toUpperCase().trim();
+  
+  if (SYMBOL_MAP[cleanAsset]) return SYMBOL_MAP[cleanAsset];
   if (SYMBOL_MAP[asset]) return SYMBOL_MAP[asset];
-  if (asset.includes(':')) return asset;
-  if (asset.endsWith('.NS')) return `NSE:${asset.replace('.NS','')}`;
-  return `OANDA:${asset.replace(/[-/]/g, '')}`;
+  if (cleanAsset.includes(':')) return cleanAsset;
+  
+  // Indian stocks ending in .NS or standard NSE formats
+  if (cleanAsset.endsWith('.NS')) return `NSE:${cleanAsset.replace('.NS', '')}`;
+  
+  // Cryptos (BTC, ETH, SOL, XRP, DOGE, etc.)
+  if (cleanAsset.includes('BTC') || cleanAsset.includes('ETH') || cleanAsset.includes('SOL') || cleanAsset.includes('DOGE') || cleanAsset.includes('ADA') || cleanAsset.includes('XRP') || cleanAsset.includes('USDT')) {
+    const rawCrypto = cleanAsset.replace(/[-_]/g, '');
+    if (rawCrypto.endsWith('USD')) return `BINANCE:${rawCrypto}T`;
+    if (!rawCrypto.endsWith('USDT')) return `BINANCE:${rawCrypto}USDT`;
+    return `BINANCE:${rawCrypto}`;
+  }
+  
+  // Common global index terms
+  if (cleanAsset === 'NIFTY' || cleanAsset === 'NIFTY50') return 'NSE:NIFTY';
+  if (cleanAsset === 'BANKNIFTY') return 'NSE:BANKNIFTY';
+  if (cleanAsset === 'SPY' || cleanAsset === 'SPX' || cleanAsset === 'S&P 500') return 'AMEX:SPY';
+  if (cleanAsset === 'QQQ' || cleanAsset === 'NASDAQ') return 'NASDAQ:QQQ';
+  
+  // Forex pairs (EURUSD, GBPUSD, USDJPY, AUDUSD, USDCAD, USDCHF, NZDUSD)
+  if (cleanAsset.length === 6 && (cleanAsset.startsWith('EUR') || cleanAsset.startsWith('GBP') || cleanAsset.startsWith('USD') || cleanAsset.startsWith('AUD') || cleanAsset.startsWith('NZD') || cleanAsset.startsWith('CAD') || cleanAsset.startsWith('CHF'))) {
+    return `OANDA:${cleanAsset}`;
+  }
+  if (cleanAsset.length === 7 && cleanAsset.includes('-') && (cleanAsset.startsWith('EUR') || cleanAsset.startsWith('GBP') || cleanAsset.startsWith('USD'))) {
+    return `OANDA:${cleanAsset.replace('-', '')}`;
+  }
+  
+  // Default fallback for general US stocks (AAPL, TSLA, AMD, NVDA, etc.)
+  if (cleanAsset.length >= 2 && cleanAsset.length <= 5) {
+    return `NASDAQ:${cleanAsset}`;
+  }
+  
+  return `OANDA:${cleanAsset.replace(/[-/]/g, '')}`;
 }
 
 function TVPane({ id, symbol, scriptLoaded, compact = false }) {
