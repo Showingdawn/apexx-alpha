@@ -9,11 +9,14 @@ import MarketDepth from "@/components/MarketDepth";
 import StatsBar from "@/components/StatsBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import TopBarTicker from "@/components/TopBarTicker";
+import AlphaSentinel from "@/components/AlphaSentinel";
 import Watchlist from "@/components/Watchlist";
 import GrowwSearch from "@/components/GrowwSearch";
 import PortfolioHeatmap from "@/components/PortfolioHeatmap";
+import AlphaQuests from "@/components/AlphaQuests";
 import TraderConsole from "@/components/TraderConsole";
 import CommandBar from "@/components/CommandBar";
+import PresentationHUD from "@/components/PresentationHUD";
 import axios from "axios";
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
@@ -21,6 +24,8 @@ import { useRouter } from "next/navigation";
 export default function TradePage() {
   const [optimisticTrades, setOptimisticTrades] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState("BTC-USD");
+  const [showConsole, setShowConsole] = useState(false);
+  const [activeInsight, setActiveInsight] = useState('IDLE');
   const [zenMode, setZenMode] = useState(false);
   const [slPrice, setSlPrice] = useState(0);
   const [tpPrice, setTpPrice] = useState(0);
@@ -43,8 +48,10 @@ export default function TradePage() {
     }, 0);
 
     if (dailyLoss < -500 && !isLocked) {
-      setIsLocked(true);
-      setLockTime(3600);
+      setTimeout(() => {
+        setIsLocked(true);
+        setLockTime(3600);
+      }, 0);
     }
   }, [optimisticTrades, isLocked]);
 
@@ -54,12 +61,28 @@ export default function TradePage() {
       const timer = setInterval(() => setLockTime(prev => prev - 1), 1000);
       return () => clearInterval(timer);
     } else if (lockTime <= 0 && isLocked) {
-      setIsLocked(false);
+      setTimeout(() => setIsLocked(false), 0);
     }
   }, [lockTime, isLocked]);
 
-  // Balance Fetch
+  // Balance Fetch & Local Restoration on Mount
   useEffect(() => {
+    // Immediate local restoration
+    const localBal = localStorage.getItem("apex_local_balance");
+    if (localBal !== null) {
+      setBalance(parseFloat(localBal));
+    } else {
+      setBalance(100000);
+      localStorage.setItem("apex_local_balance", "100000");
+    }
+
+    const localTrades = localStorage.getItem("apex_local_trades");
+    if (localTrades) {
+      try {
+        setOptimisticTrades(JSON.parse(localTrades));
+      } catch (e) {}
+    }
+
     const fetchBalance = async () => {
       if (!auth.currentUser) return;
       try {
@@ -67,9 +90,12 @@ export default function TradePage() {
         const res = await axios.get("/api/user/", {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setBalance(res.data.balance);
+        if (res.data.status !== 'SOVEREIGN_RECOVERY') {
+          setBalance(res.data.balance);
+          localStorage.setItem("apex_local_balance", res.data.balance.toString());
+        }
       } catch (err) {
-        console.error("Balance fetch failed", err);
+        console.error("Balance fetch failed, falling back to local balance", err);
       }
     };
     fetchBalance();
@@ -101,15 +127,58 @@ export default function TradePage() {
   // Trailing SL Logic
   useEffect(() => {
     if (isTrailing && currentPrice > highestSinceOpen) {
-      setHighestSinceOpen(currentPrice);
-      if (slPrice > 0 && highestSinceOpen > 0) {
-        const movePercent = (currentPrice - highestSinceOpen) / highestSinceOpen;
-        if (movePercent > 0.005) { 
-           setSlPrice(prev => prev * (1 + movePercent));
+      setTimeout(() => {
+        setHighestSinceOpen(currentPrice);
+        if (slPrice > 0 && highestSinceOpen > 0) {
+          const movePercent = (currentPrice - highestSinceOpen) / highestSinceOpen;
+          if (movePercent > 0.005) { 
+             setSlPrice(prev => prev * (1 + movePercent));
+          }
         }
-      }
+      }, 0);
     }
   }, [currentPrice, isTrailing, slPrice, highestSinceOpen]);
+
+  const handleFlashTrade = useCallback(async () => {
+    if (optimisticTrades.length === 0) return;
+    const target = optimisticTrades.find(t => t.status === 'OPEN');
+    if (!target) return;
+
+    const livePrice = currentPrice || target.entryPrice || 100;
+    const spread = target.type === 'BUY' ? livePrice - target.entryPrice : target.entryPrice - livePrice;
+    const localPnl = spread * target.lot - (target.fees?.total ?? 0);
+    const returnedCash = livePrice * target.lot;
+
+    // Local balance calculation
+    const newBalance = balance + returnedCash;
+    setBalance(newBalance);
+    localStorage.setItem("apex_local_balance", newBalance.toString());
+
+    // Update optimistic trades list
+    const updatedTrades = optimisticTrades.map(t => 
+      t.id === target.id ? { ...t, status: 'CLOSED', exitPrice: livePrice, pnl: localPnl } : t
+    );
+    setOptimisticTrades(updatedTrades);
+    localStorage.setItem("apex_local_trades", JSON.stringify(updatedTrades));
+
+    if (localPnl < 0) {
+      setImpactActive(true);
+      setTimeout(() => setImpactActive(false), 2000);
+    }
+
+    toast?.success?.(`Position closed! Yield PnL: $${localPnl.toFixed(2)}`);
+
+    if (!auth.currentUser) return;
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      await axios.post(`/api/trade/close/${target.id}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (err) {
+      console.warn("Backend trade close failed, kept local liquidation", err);
+    }
+  }, [optimisticTrades, balance, currentPrice]);
 
   // Hotkeys
   useEffect(() => {
@@ -126,29 +195,11 @@ export default function TradePage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [optimisticTrades]);
-
-  const handleFlashTrade = async () => {
-    if (optimisticTrades.length === 0) return;
-    const target = optimisticTrades.find(t => t.status === 'OPEN');
-    if (!target) return;
-    try {
-      const token = await auth.currentUser.getIdToken();
-      const res = await axios.post(`/api/trade/close/${target.id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setOptimisticTrades(prev => prev.map(t => t.id === target.id ? { ...t, status: 'CLOSED', pnl: res.data.pnl || -100 } : t));
-      if ((res.data.pnl || -100) < 0) {
-        setImpactActive(true);
-        setTimeout(() => setImpactActive(false), 2000);
-      }
-    } catch (err) {
-      console.error("Flash trade failed", err);
-    }
-  };
+  }, [handleFlashTrade]);
 
   const handleAssetChange = (newAsset) => {
-    const cleanAsset = newAsset.includes(':') ? newAsset.split(':').pop() : newAsset;
+    const parts = newAsset.split(':');
+    const cleanAsset = newAsset.includes(':') ? parts[parts.length - 1] : newAsset;
     setSelectedAsset(cleanAsset);
     setHighestSinceOpen(0); // Reset for Trailing SL
   }
@@ -221,9 +272,14 @@ export default function TradePage() {
         {!zenMode && (
           <motion.div
             variants={sidebarVariants}
-            className="hidden xl:block"
+            className="hidden xl:flex flex-col w-[320px] border-r border-white/5 bg-[#020205]/80 overflow-y-auto"
           >
-            <Watchlist onAssetSelect={handleAssetChange} onAction={(type, symbol) => { triggerHaptic(); handleAssetChange(symbol); }} />
+            <div className="flex-1 min-h-[400px]">
+              <Watchlist onAssetSelect={handleAssetChange} onAction={(type, symbol) => { triggerHaptic(); handleAssetChange(symbol); }} />
+            </div>
+            <div className="p-4 shrink-0 border-t border-white/5">
+              <AlphaSentinel activeInsight={activeInsight} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -245,7 +301,7 @@ export default function TradePage() {
              </div>
 
              <div className="flex items-center gap-6 flex-shrink-0">
-                <StatsBar balance={balance} setBalance={setBalance} />
+                <StatsBar balance={balance} setBalance={setBalance} optimisticTrades={optimisticTrades} />
              </div>
           </motion.div>
         )}
@@ -266,61 +322,46 @@ export default function TradePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* CENTER COLUMN: CHART & INSIGHTS (8 cols) */}
-              <div className="lg:col-span-8 flex flex-col gap-8">
-                <div className="h-[640px] glass-panel border-white/10 overflow-hidden shadow-2xl">
-                  <Chart 
-                    selectedAsset={selectedAsset} 
-                    onAssetSearch={handleAssetChange} 
-                    slPrice={slPrice}
-                    tpPrice={tpPrice}
-                    setSlPrice={setSlPrice}
-                    setTpPrice={setTpPrice}
-                    splitMode={splitMode}
-                    onSplitChange={setSplitMode}
-                  />
-                </div>
-                
-                {/* Insights Dual Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   <div className="glass-panel p-6 border-white/10 hover:border-[#f0c040]/30 transition-all">
-                      <PortfolioHeatmap trades={optimisticTrades} />
-                   </div>
-                   <div className="glass-panel p-6 border-white/10 hover:border-[#f0c040]/30 transition-all">
-                      <MarketDepth price={currentPrice} />
-                   </div>
-                </div>
-
-                <div className="glass-panel border-white/10 shadow-2xl">
-                   <TradeHistory optimisticTrades={optimisticTrades} setOptimisticTrades={setOptimisticTrades} />
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start w-full">
+              {/* TOP ROW: CHART & EXECUTION */}
+              <div className="lg:col-span-8 glass-panel border-white/10 overflow-hidden shadow-2xl h-[740px]">
+                <Chart 
+                  selectedAsset={selectedAsset} 
+                  onAssetSearch={handleAssetChange} 
+                  slPrice={slPrice}
+                  tpPrice={tpPrice}
+                  setSlPrice={setSlPrice}
+                  setTpPrice={setTpPrice}
+                  splitMode={splitMode}
+                  onSplitChange={setSplitMode}
+                  setActiveInsight={setActiveInsight}
+                />
               </div>
 
-              {/* RIGHT COLUMN: EXECUTION (4 cols) */}
-              <div className="lg:col-span-4 flex flex-col gap-8 sticky top-0">
-                <div className="glass-panel border-white/10 p-1 shadow-2xl">
-                  <OrderPanel 
-                    setOptimisticTrades={setOptimisticTrades} 
-                    selectedAsset={selectedAsset}
-                    onAssetChange={handleAssetChange} 
-                    slPrice={slPrice}
-                    tpPrice={tpPrice}
-                    setSlPrice={setSlPrice}
-                    setTpPrice={setTpPrice}
-                    balance={balance}
-                    currentPrice={currentPrice}
-                    isLocked={isLocked}
-                    lockTime={lockTime}
-                    isTrailing={isTrailing}
-                    setIsTrailing={setIsTrailing}
-                    onTrade={triggerHaptic}
-                  />
-                </div>
-                
-                <div className="glass-panel border-white/10 shadow-2xl h-full">
-                  <TraderConsole history={optimisticTrades} />
-                </div>
+              <div className="lg:col-span-4 glass-panel border-white/10 shadow-2xl h-[740px] overflow-y-auto custom-scrollbar">
+                <OrderPanel 
+                  setOptimisticTrades={setOptimisticTrades} 
+                  selectedAsset={selectedAsset}
+                  onAssetChange={handleAssetChange} 
+                  slPrice={slPrice}
+                  tpPrice={tpPrice}
+                  setSlPrice={setSlPrice}
+                  setTpPrice={setTpPrice}
+                  balance={balance}
+                  setBalance={setBalance}
+                  currentPrice={currentPrice}
+                  isLocked={isLocked}
+                  setActiveInsight={setActiveInsight}
+                  lockTime={lockTime}
+                  isTrailing={isTrailing}
+                  setIsTrailing={setIsTrailing}
+                  onTrade={triggerHaptic}
+                />
+              </div>
+
+              {/* BOTTOM ROW: FULL-WIDTH QUANT EXECUTION TERMINAL */}
+              <div className="lg:col-span-12 glass-panel border-white/10 h-[450px] shadow-2xl overflow-hidden p-4">
+                <TraderConsole history={optimisticTrades} />
               </div>
             </div>
           </div>

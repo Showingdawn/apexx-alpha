@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import StatsBar from "@/components/StatsBar";
@@ -8,6 +8,24 @@ import { Shield, Lock, Zap } from "lucide-react";
 
 export default function PortfolioPage() {
   const [trades, setTrades] = useState([]); 
+  const [balance, setBalance] = useState(0);
+
+  useEffect(() => {
+    const localBal = localStorage.getItem("apex_local_balance");
+    if (localBal !== null) {
+      setBalance(parseFloat(localBal));
+    } else {
+      setBalance(100000);
+      localStorage.setItem("apex_local_balance", "100000");
+    }
+
+    const localTrades = localStorage.getItem("apex_local_trades");
+    if (localTrades) {
+      try {
+        setTrades(JSON.parse(localTrades));
+      } catch (e) {}
+    }
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -68,7 +86,7 @@ export default function PortfolioPage() {
                <div className="p-6 border-b border-white/5 bg-white/[0.01]">
                   <h2 className="text-[10px] font-header font-black text-gray-400 uppercase tracking-[0.2em]">Inventory Matrix</h2>
                </div>
-               <StatsBar />
+               <StatsBar balance={balance} setBalance={setBalance} optimisticTrades={trades} />
             </div>
           </motion.div>
           

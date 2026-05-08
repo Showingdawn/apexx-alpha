@@ -30,7 +30,7 @@ export default function Watchlist({ onAssetSelect, onAction }) {
   }, []);
 
   return (
-    <div className="w-72 h-full flex flex-col glass-sidebar border-r border-white/5 bg-black/40 backdrop-blur-3xl overflow-hidden">
+    <div className="w-full h-full flex flex-col glass-sidebar border-r border-white/5 bg-black/40 backdrop-blur-3xl overflow-hidden">
       <div className="p-4 border-b border-white/5 flex justify-between items-center">
         <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-gray-500 flex items-center gap-2">
           <LayoutGrid size={12} className="text-[#D4AF37]" /> Market Watch

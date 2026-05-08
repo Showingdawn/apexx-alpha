@@ -53,9 +53,23 @@ function MagneticButton({ children, className, href }) {
 // ─── Main Landing Page ───────────────────────────────────
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [stars, setStars] = useState([]);
 
   useEffect(() => {
-    setMounted(true);
+    setTimeout(() => {
+      setMounted(true);
+      setStars(Array.from({ length: 50 }).map(() => ({
+        top: `${Math.random() * 100}%`,
+        left: `${Math.random() * 100}%`,
+        width: `${Math.random() * 2}px`,
+        height: `${Math.random() * 2}px`,
+        boxShadow: `0 0 ${Math.random() * 5}px rgba(255, 255, 255, 0.5)`,
+        opacity: Math.random(),
+        scale: Math.random(),
+        duration: 2 + Math.random() * 3,
+        delay: Math.random() * 5
+      })));
+    }, 0);
   }, []);
 
   if (!mounted) return null;
@@ -85,26 +99,26 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-radial-gradient(circle at 50% 50%, rgba(240, 192, 64, 0.05) 0%, transparent 70%)" />
         
         {/* Layered Stars (CSS Generated) */}
-        {[...Array(50)].map((_, i) => (
+        {stars.map((star, i) => (
           <motion.div
             key={i}
-            initial={{ opacity: Math.random(), scale: Math.random() }}
+            initial={{ opacity: star.opacity, scale: star.scale }}
             animate={{ 
               opacity: [0.2, 0.8, 0.2],
               scale: [1, 1.2, 1]
             }}
             transition={{ 
-              duration: 2 + Math.random() * 3, 
+              duration: star.duration, 
               repeat: Infinity,
-              delay: Math.random() * 5
+              delay: star.delay
             }}
             className="absolute rounded-full bg-white"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              width: `${Math.random() * 2}px`,
-              height: `${Math.random() * 2}px`,
-              boxShadow: `0 0 ${Math.random() * 5}px rgba(255, 255, 255, 0.5)`
+              top: star.top,
+              left: star.left,
+              width: star.width,
+              height: star.height,
+              boxShadow: star.boxShadow
             }}
           />
         ))}

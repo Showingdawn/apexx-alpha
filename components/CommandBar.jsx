@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import {
@@ -58,7 +58,7 @@ export default function CommandBar({ isOpen, onClose, onAction }) {
     ? PINNED_COMMANDS.filter(c => c.label.toLowerCase().includes(query.toLowerCase()))
     : PINNED_COMMANDS;
 
-  const allItems = [...visibleCommands, ...results];
+  const allItems = useMemo(() => [...visibleCommands, ...results], [visibleCommands, results]);
   const total = allItems.length;
 
   const handleSelect = useCallback((item) => {
@@ -212,7 +212,7 @@ export default function CommandBar({ isOpen, onClose, onAction }) {
               {/* Empty state */}
               {!loading && query.length > 1 && results.length === 0 && visibleCommands.length === 0 && (
                 <div className="py-10 text-center">
-                  <p className="text-gray-700 text-[12px] font-bold">No results for "{query}"</p>
+                  <p className="text-gray-700 text-[12px] font-bold">No results for &quot;{query}&quot;</p>
                 </div>
               )}
 

@@ -4,10 +4,13 @@ import { useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { motion } from "framer-motion";
-import { Globe, Activity, Zap } from "lucide-react";
+import { Globe, Activity, Zap, Headphones, User } from "lucide-react";
+import { startAmbientDrone, stopAmbientDrone, playMechanicalClick } from "@/utils/sound";
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
+  const [isDroneActive, setIsDroneActive] = useState(false);
+  const [navBalance, setNavBalance] = useState(100000);
   const [marketStatus, setMarketStatus] = useState({
     nse: "REGULAR",
     nyse: "CLOSED",
@@ -15,6 +18,14 @@ export default function Navbar() {
   });
 
   useEffect(() => {
+    const localBal = localStorage.getItem("apex_local_balance");
+    if (localBal) setNavBalance(parseFloat(localBal));
+
+    const balInterval = setInterval(() => {
+      const updated = localStorage.getItem("apex_local_balance");
+      if (updated) setNavBalance(parseFloat(updated));
+    }, 1500);
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
@@ -41,12 +52,23 @@ export default function Navbar() {
     return () => {
       unsubscribe();
       clearInterval(interval);
+      clearInterval(balInterval);
     };
   }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
     window.location.href = "/";
+  };
+
+  const toggleDrone = () => {
+    playMechanicalClick();
+    if (isDroneActive) {
+      stopAmbientDrone();
+    } else {
+      startAmbientDrone();
+    }
+    setIsDroneActive(!isDroneActive);
   };
 
   return (
@@ -83,8 +105,31 @@ export default function Navbar() {
           <>
             <Link href="/trade" className="text-white/60 hover:text-[#f0c040] transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Trade</Link>
             <Link href="/portfolio" className="text-white/60 hover:text-[#f0c040] transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Vault</Link>
-            <Link href="/performance" className="text-white/60 hover:text-[#f0c040] transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Audit</Link>
-            <Link href="/ib" className="text-[#f0c040] hover:brightness-125 transition font-header font-black text-[10px] uppercase tracking-[0.2em] border-b border-[#f0c040]/30 py-1">Partner</Link>
+            <Link href="/audit" className="text-[#f0c040] hover:brightness-125 transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Audit</Link>
+            <Link href="/learn" className="text-[#f0c040] hover:brightness-125 transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Learn</Link>
+            <Link href="/news" className="text-[#f0c040] hover:brightness-125 transition font-header font-black text-[10px] uppercase tracking-[0.2em]">News</Link>
+            <Link href="/algo" className="text-[#f0c040] hover:brightness-125 transition font-header font-black text-[10px] uppercase tracking-[0.2em]">Algo</Link>
+            <div className="h-5 w-px bg-white/10 mx-2"></div>
+            
+            {/* Sovereign Soundscapes Focus Synth Toggle */}
+            <button
+              onClick={toggleDrone}
+              title={isDroneActive ? "Mute Sovereign Soundscape" : "Activate Lo-Fi Cyber Focus Soundscape"}
+              className={`p-2 border rounded-full transition-all flex items-center justify-center ${isDroneActive ? 'bg-[#FFBF00]/20 border-[#FFBF00] text-[#FFBF00] shadow-[0_0_12px_rgba(255,191,0,0.35)]' : 'bg-white/5 border-white/10 text-gray-500 hover:text-white'}`}
+            >
+              <Headphones size={13} className={isDroneActive ? 'animate-bounce' : ''} />
+            </button>
+
+            <div className="h-5 w-px bg-white/10 mx-2"></div>
+
+            {/* Sovereign Cash Wallet Balance */}
+            <div className="flex items-center gap-2 bg-[#FFBF00]/10 border border-[#FFBF00]/20 px-3 py-1.5 rounded-sm">
+              <span className="text-[7.5px] font-mono text-[#FFBF00] tracking-[0.2em] font-black">CASH</span>
+              <span className="text-[10px] font-mono font-black text-white">
+                ${navBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
             <div className="h-5 w-px bg-white/10 mx-2"></div>
             <button 
               onClick={handleLogout} 
@@ -92,6 +137,15 @@ export default function Navbar() {
             >
               Terminate Session
             </button>
+
+            <div className="h-5 w-px bg-white/10 mx-2"></div>
+
+            {/* Top-Right Circular Profile Avatar */}
+            <Link href="/profile" title="Sovereign Profile & Command Center">
+              <div className="w-8 h-8 rounded-full border border-[#f0c040]/30 hover:border-[#f0c040] hover:bg-[#f0c040]/20 text-[#f0c040] flex items-center justify-center transition-all cursor-pointer shadow-[0_0_10px_rgba(240,192,64,0.15)] bg-[#f0c040]/5">
+                <User size={13} className="text-[#f0c040]" />
+              </div>
+            </Link>
           </>
         ) : (
           <>

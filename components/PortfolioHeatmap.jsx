@@ -34,7 +34,7 @@ export default function PortfolioHeatmap({ trades }) {
                  {trade.pnl >= 0 ? '+' : ''}{Math.abs(trade.pnl).toFixed(0)}
                </span>
                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-[#111] border border-white/10 rounded text-[8px] text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  {trade.asset} // {trade.type} @ {new Date(trade.createdAt).toLocaleTimeString()}
+                  {trade.asset} {'//'} {trade.type} @ {new Date(trade.createdAt).toLocaleTimeString()}
                </div>
             </motion.div>
           ))

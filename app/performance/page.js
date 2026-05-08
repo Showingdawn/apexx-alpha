@@ -134,19 +134,39 @@ export default function PerformancePage() {
 
   useEffect(() => {
     const fetchTrades = async () => {
-      if (!auth.currentUser) { setLoading(false); return; }
-      try {
-        const token = await auth.currentUser.getIdToken();
-        const res   = await axios.get("http://localhost:3001/api/trade/history", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const sorted = res.data.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-        setTrades(sorted);
-      } catch (e) {
-        console.error("Failed to fetch trades:", e);
-      } finally {
-        setLoading(false);
+      let tradesArray = [];
+
+      // 1. Load active paper trading data from localStorage
+      const localTrades = localStorage.getItem("apex_local_trades");
+      if (localTrades) {
+        try {
+          tradesArray = JSON.parse(localTrades);
+        } catch (e) {
+          console.error("Failed parsing local trades inside Performance", e);
+        }
       }
+
+      // 2. Fetch backend trades if user is authenticated
+      if (auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          const res   = await axios.get("http://localhost:3001/api/trade/history", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.data && res.data.length > 0) {
+            // Deduplicate by ID
+            const existingIds = new Set(tradesArray.map(t => t.id));
+            const uniqueBackend = res.data.filter(t => !existingIds.has(t.id));
+            tradesArray = [...tradesArray, ...uniqueBackend];
+          }
+        } catch (e) {
+          console.error("Failed to fetch backend trades:", e);
+        }
+      }
+
+      const sorted = tradesArray.sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp));
+      setTrades(sorted);
+      setLoading(false);
     };
     fetchTrades();
   }, []);

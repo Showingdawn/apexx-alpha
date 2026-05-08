@@ -46,13 +46,35 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.post('/reset', requireAuth, async (req: AuthenticatedRequest, res) => {
+router.post('/add-funds', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const uid = req.user!.uid;
-    await db.collection('users').doc(uid).update({ balance: 10000 });
-    res.json({ success: true, balance: 10000 });
+    let newBalance = 100000;
+    
+    try {
+      const userDoc = await db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        const currentBalance = userDoc.data()?.balance || 0;
+        const addAmount = req.body.amount || 10000;
+        const isPremium = req.body.isPremium || false;
+        newBalance = isPremium 
+          ? currentBalance + addAmount 
+          : Math.min(100000, currentBalance + addAmount);
+        await db.collection('users').doc(uid).update({ balance: newBalance });
+      }
+    } catch (dbError) {
+      console.warn("[Sovereign-Recovery] Add funds using local ledger fallback.");
+      const currentBalance = req.body.currentBalance || 0;
+      const addAmount = req.body.amount || 10000;
+      const isPremium = req.body.isPremium || false;
+      newBalance = isPremium
+        ? currentBalance + addAmount
+        : Math.min(100000, currentBalance + addAmount);
+    }
+    
+    res.json({ success: true, balance: newBalance });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to reset balance' });
+    res.status(500).json({ error: 'Failed to add funds' });
   }
 });
 
